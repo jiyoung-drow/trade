@@ -1,17 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchUserApplications, participateInApplication } from "../../../lib/firestore";
-import { onAuthStateChanged, auth } from "firebase/auth";
+import { fetchUserApplications, participateInApplication } from "../../../src/lib/firestore";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 
-export default function SellerMypage() {
+const auth = getAuth();
+
+export default function BuyerMypage() {
   const [apps, setApps] = useState<any[]>([]);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
     onAuthStateChanged(auth, async (user) => {
       if (user) {
-        const res = await fetchUserApplications(user.uid, "seller");
+        const res = await fetchUserApplications(user.uid, "buyer");
         setApps(res);
       } else {
         setMessage("로그인이 필요합니다.");

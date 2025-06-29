@@ -1,10 +1,9 @@
-import { initializeApp } from "firebase/app";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
+  experimental: {
+    appDir: true,
+  },
+};
 
-const firebaseConfig = { /* ... */ };
-const app = initializeApp(firebaseConfig);
-
-export const auth = getAuth(app);
-export { onAuthStateChanged };
-export const db = getFirestore(app);
+module.exports = nextConfig;

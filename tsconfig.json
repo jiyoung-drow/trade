@@ -1,27 +1,27 @@
 {
   "compilerOptions": {
-    "target": "ESNext",
-    "module": "ESNext",
+    "target": "es5",
     "lib": [
-      "DOM",
-      "DOM.Iterable",
-      "ESNext"
+      "dom",
+      "dom.iterable",
+      "esnext"
     ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
-    "incremental": true,
-    "moduleResolution": "Node",
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "node",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "esModuleInterop": true,
     "jsx": "preserve",
-    "baseUrl": "./src", // ✅ src 기준으로 잡힘
+    "incremental": true,
+    "baseUrl": ".",
     "paths": {
       "@/*": [
-        "*"
+        "./*"
       ]
     },
     "plugins": [
@@ -31,9 +31,9 @@
     ]
   },
   "include": [
+    "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    "next-env.d.ts",
     ".next/types/**/*.ts"
   ],
   "exclude": [
