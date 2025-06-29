@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchUserApplications, participateInApplication } from "../../../src/lib/firestore";
+import { fetchUserApplications, participateInApplication } from "../../../lib/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 
 const auth = getAuth();
