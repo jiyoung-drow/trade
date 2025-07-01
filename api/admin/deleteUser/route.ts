@@ -1,20 +1,24 @@
 import { NextResponse } from 'next/server';
-import adminAuth from '@/lib/adminAuth';
-import adminDb from '@/lib/adminDb';
+import { adminAuth, adminDb } from '@/lib/admin';
 
 export async function POST(req: Request) {
   try {
     const json = await req.json();
     const uid = json.uid;
+    const role = json.role;
 
-    if (!uid) {
-      return NextResponse.json(
-        { error: "권한이 없습니다. (UID 없음)" },
-        { status: 400 }
-      );
+    if (!role) {
+      return new Response(JSON.stringify({ error: "권한이 없습니다." }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
-    // Firebase Auth 에서 계정 삭제
+    if (!uid) {
+      return NextResponse.json({ error: "UID가 없습니다." }, { status: 400 });
+    }
+
+    // Firebase Auth에서 유저 삭제
     await adminAuth.deleteUser(uid);
 
     // Firestore 'users' 컬렉션에서 유저 문서 삭제
@@ -23,9 +27,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('유저 삭제 오류:', error);
-    return NextResponse.json(
-      { error: "유저 삭제 중 오류가 발생했습니다." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "유저 삭제 중 오류가 발생했습니다." }, { status: 500 });
   }
 }
