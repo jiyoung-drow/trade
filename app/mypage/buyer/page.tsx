@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { fetchUserApplications, participateInApplication } from "../../../lib/firestore";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
-
-const auth = getAuth();
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 export default function BuyerMypage() {
   const [apps, setApps] = useState<any[]>([]);
