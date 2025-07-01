@@ -27,13 +27,14 @@ export default function SellerDashboard() {
         const buyerList: any[] = [];
 
         for (const docSnap of buyerSnap.docs) {
-          const appData = { id: docSnap.id, ...docSnap.data() };
+          const data = docSnap.data() as { createdAt?: any; [key: string]: any };
+          const appData = { id: docSnap.id, ...data };
+
           const createdAt = appData.createdAt?.toDate().getTime() || 0;
           const elapsedSeconds = (now - createdAt) / 1000;
 
           if (elapsedSeconds > 600) {
             await deleteDoc(doc(db, 'applications', appData.id));
-            console.log(`만료된 신청서 자동 삭제: ${appData.id}`);
           } else {
             buyerList.push(appData);
           }
@@ -49,6 +50,7 @@ export default function SellerDashboard() {
 
   const formatDisplay = (app: any) => {
     let display = '';
+
     if (app.item === '물고기') {
       display = `${app.fishName ?? ''} ${app.quantity}개 ${app.secretPrice ?? app.price}원`;
     } else {
@@ -71,7 +73,7 @@ export default function SellerDashboard() {
     try {
       await updateDoc(doc(db, 'applications', appId), { status: '진행중', sellerId: auth.currentUser?.uid });
       alert('거래에 참여하였습니다.');
-      router.push('/dashboard/seller'); // 새로고침
+      router.refresh();
     } catch (error) {
       console.error(error);
       alert('참여 중 오류가 발생했습니다.');
@@ -82,7 +84,7 @@ export default function SellerDashboard() {
     <div className="max-w-md mx-auto p-4 space-y-2">
       <h1 className="text-xl font-bold mb-2">판매자 거래목록</h1>
       <p className="text-sm text-gray-600">
-        구매자가 작성한 신청서 목록입니다. 10분이 지나면 자동 삭제되며 거래에 참여 시 “진행중” 상태로 전환됩니다.
+        구매자가 작성한 신청서 목록입니다. 10분 경과 시 자동 삭제되며, 참여 시 진행중 상태로 전환됩니다.
       </p>
       {message && <p className="text-red-600">{message}</p>}
 
