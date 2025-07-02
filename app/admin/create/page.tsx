@@ -40,14 +40,12 @@ export default function AdminCreatePage() {
   }
 
   if (!isSuperAdmin) {
-    return null; // 권한 없는 경우 화면 숨김 처리
+    return null; // 권한 없는 경우 화면 숨김
   }
 
   return (
     <div className="max-w-xl mx-auto p-4">
       <h1 className="text-xl font-bold mb-4">👑 슈퍼관리자 - 관리자 생성 페이지</h1>
-
-      {/* 여기에 관리자 생성 폼 구현 */}
       <form className="space-y-3">
         <input
           type="email"
