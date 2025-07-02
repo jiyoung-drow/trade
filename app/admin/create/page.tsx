@@ -3,64 +3,78 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { onAuthStateChanged, createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
-export default function AdminCreatePage() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
+export default function CreateAdminPage() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
-    const checkAuth = async () => {
-      onAuthStateChanged(auth, async (user) => {
-        if (!user) {
-          router.push('/admin/login');
-          return;
-        }
-
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        const data = userDoc.data();
-
-        if (data?.role === 'superadmin') {
-          setIsSuperAdmin(true);
-        } else {
-          router.push('/admin/login');
-        }
-
-        setLoading(false);
-      });
-    };
-
-    checkAuth();
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        router.push('/admin/login');
+        return;
+      }
+      const userDoc = await db.collection('users').doc(user.uid).get();
+      const data = userDoc.data();
+      if (data?.role === 'superadmin') {
+        setIsSuperAdmin(true);
+      } else {
+        router.push('/admin/login');
+      }
+    });
+    return () => unsubscribe();
   }, [router]);
 
-  if (loading) {
-    return <div className="p-6 text-center">로딩 중...</div>;
-  }
+  const handleCreateAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      await setDoc(doc(db, 'users', user.uid), {
+        email,
+        role: 'admin',
+        createdAt: serverTimestamp(),
+      });
+      alert('관리자 계정이 생성되었습니다.');
+      setEmail('');
+      setPassword('');
+    } catch (error) {
+      if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert('계정 생성 실패');
+      }
+    }
+  };
 
   if (!isSuperAdmin) {
-    return null; // 권한 없는 경우 화면 숨김
+    return <div className="p-6 text-center">접근 권한이 없습니다.</div>;
   }
 
   return (
-    <div className="max-w-xl mx-auto p-4">
-      <h1 className="text-xl font-bold mb-4">👑 슈퍼관리자 - 관리자 생성 페이지</h1>
-      <form className="space-y-3">
+    <div className="max-w-md mx-auto p-4">
+      <h1 className="text-xl font-bold mb-4">👑 슈퍼관리자 - 관리자 계정 생성</h1>
+      <form onSubmit={handleCreateAdmin} className="space-y-3">
         <input
           type="email"
           placeholder="관리자 이메일"
-          className="w-full p-2 border rounded"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full border p-2 rounded"
+          required
         />
         <input
           type="password"
           placeholder="초기 비밀번호"
-          className="w-full p-2 border rounded"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="w-full border p-2 rounded"
+          required
         />
-        <select className="w-full p-2 border rounded">
-          <option value="admin">일반 관리자</option>
-          <option value="superadmin">슈퍼관리자</option>
-        </select>
         <button
           type="submit"
           className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
