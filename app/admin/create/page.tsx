@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged, createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 
-export default function CreateAdminPage() {
+export default function AdminCreatePage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -18,14 +18,18 @@ export default function CreateAdminPage() {
         router.push('/admin/login');
         return;
       }
-      const userDoc = await db.collection('users').doc(user.uid).get();
-      const data = userDoc.data();
+
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      const data = userDocSnap.data();
+
       if (data?.role === 'superadmin') {
         setIsSuperAdmin(true);
       } else {
         router.push('/admin/login');
       }
     });
+
     return () => unsubscribe();
   }, [router]);
 
@@ -52,7 +56,7 @@ export default function CreateAdminPage() {
   };
 
   if (!isSuperAdmin) {
-    return <div className="p-6 text-center">접근 권한이 없습니다.</div>;
+    return <div className="p-6 text-center">슈퍼관리자만 접근 가능합니다.</div>;
   }
 
   return (
