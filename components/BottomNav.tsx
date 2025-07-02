@@ -13,6 +13,7 @@ export default function BottomNav() {
   const [shouldRender, setShouldRender] = useState(true);
 
   useEffect(() => {
+    // 로그인, 회원가입 페이지에서는 탭바 숨김
     if (pathname === '/login' || pathname === '/signup') {
       setShouldRender(false);
       return;
@@ -20,6 +21,7 @@ export default function BottomNav() {
       setShouldRender(true);
     }
 
+    // 로그인 상태 및 역할 확인
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         const docRef = doc(db, 'users', user.uid);
@@ -37,9 +39,11 @@ export default function BottomNav() {
 
   if (!shouldRender || !role) return null;
 
+  // 역할별 경로 설정
   const base = role === 'buyer' ? '/dashboard/buyer' : '/dashboard/seller';
-  const mypage = role === 'buyer' ? '/mypage/buyer' : '/mypage/seller';
+  const inprogress = role === 'buyer' ? '/inprogress/buyer' : '/inprogress/seller';
   const write = '/application/new';
+  const mypage = role === 'buyer' ? '/mypage/buyer' : '/mypage/seller';
 
   return (
     <div
@@ -59,6 +63,7 @@ export default function BottomNav() {
         zIndex: 50,
       }}
     >
+      {/* 거래목록 버튼 */}
       <button
         onClick={() => router.push(base)}
         style={{
@@ -68,6 +73,19 @@ export default function BottomNav() {
       >
         거래목록
       </button>
+
+      {/* 거래중 버튼 */}
+      <button
+        onClick={() => router.push(inprogress)}
+        style={{
+          color: pathname.startsWith(inprogress) ? '#0070f3' : '#333',
+          fontWeight: pathname.startsWith(inprogress) ? 'bold' : 'normal',
+        }}
+      >
+        거래중
+      </button>
+
+      {/* 신청서 작성 버튼 */}
       <button
         onClick={() => router.push(write)}
         style={{
@@ -77,6 +95,8 @@ export default function BottomNav() {
       >
         신청서 작성
       </button>
+
+      {/* 마이페이지 버튼 */}
       <button
         onClick={() => router.push(mypage)}
         style={{

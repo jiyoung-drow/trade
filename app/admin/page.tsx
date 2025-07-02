@@ -1,137 +1,76 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { db } from "@/lib/firebase";
-import {
-  collection,
-  onSnapshot,
-  doc,
-  updateDoc,
-  increment,
-  getDoc,
-  setDoc,
-} from "firebase/firestore";
-
-interface Withdraw {
-  id: string;
-  userId: string;
-  amount: number;
-  status: string;
-}
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { db, auth } from '@/lib/firebase';
+import { collection, getDocs, deleteDoc, doc, getDoc } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 
 export default function AdminPage() {
-  const [withdraws, setWithdraws] = useState<Withdraw[]>([]);
-  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const router = useRouter();
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "withdrawRequests"), (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        userId: doc.data().userId,
-        amount: doc.data().amount,
-        status: doc.data().status,
-      }));
-      setWithdraws(data);
-    });
-    return () => unsub();
-  }, []);
+    const checkAuthAndFetch = async () => {
+      onAuthStateChanged(auth, async (user) => {
+        if (!user) {
+          alert('로그인이 필요합니다.');
+          router.push('/admin/login');
+          return;
+        }
 
-  const approveWithdraw = async (w: Withdraw) => {
-    try {
-      setLoadingId(w.id);
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        const data = userDoc.data();
+        if (!data || (data.role !== 'admin' && data.role !== 'superadmin')) {
+          alert('관리자 권한이 없습니다.');
+          router.push('/admin/login');
+          return;
+        }
 
-      const withdrawRef = doc(db, "withdrawRequests", w.id);
-      const userRef = doc(db, "users", w.userId);
-      const feeRef = doc(db, "platform", "fee");
+        // 관리자 권한 확인 후 아이템 데이터 불러오기
+        const snapshot = await getDocs(collection(db, 'items'));
+        setItems(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+        setLoading(false);
+      });
+    };
 
-      const fee = Math.floor(w.amount * 0.05);
-      const netAmount = w.amount - fee;
+    checkAuthAndFetch();
+  }, [router]);
 
-      // 사용자 문서 없으면 생성
-      const userSnap = await getDoc(userRef);
-      if (!userSnap.exists()) {
-        await setDoc(userRef, { balance: 0, role: "seller" });
-      }
-
-      // 사용자 balance 차감
-      await updateDoc(userRef, { balance: increment(-w.amount) });
-
-      // 출금 상태 승인으로 변경
-      await updateDoc(withdrawRef, { status: "approved" });
-
-      // fee 문서 없으면 생성
-      const feeSnap = await getDoc(feeRef);
-      if (!feeSnap.exists()) {
-        await setDoc(feeRef, { totalFee: fee });
-      } else {
-        await updateDoc(feeRef, { totalFee: increment(fee) });
-      }
-
-      alert(`✅ 승인 완료\n수수료: ${fee}원\n실수령액: ${netAmount}원`);
-    } catch (error) {
-      console.error("출금 승인 오류:", error);
-      alert("❌ 승인 중 오류가 발생했습니다. 콘솔 로그를 확인하세요.");
-    } finally {
-      setLoadingId(null);
-    }
+  const handleDelete = async (id: string) => {
+    const confirmDelete = confirm('정말 삭제하시겠습니까?');
+    if (!confirmDelete) return;
+    await deleteDoc(doc(db, 'items', id));
+    setItems(items.filter((item) => item.id !== id));
+    alert('삭제 완료');
   };
 
-  const rejectWithdraw = async (w: Withdraw) => {
-    try {
-      setLoadingId(w.id);
-      const withdrawRef = doc(db, "withdrawRequests", w.id);
-      await updateDoc(withdrawRef, { status: "rejected" });
-      alert("🚫 출금 요청이 반려되었습니다.");
-    } catch (error) {
-      console.error("출금 반려 오류:", error);
-      alert("❌ 반려 처리 중 오류가 발생했습니다.");
-    } finally {
-      setLoadingId(null);
-    }
-  };
+  if (loading) {
+    return <div className="p-6 text-center">로딩 중...</div>;
+  }
 
   return (
-    <main className="p-6 space-y-4 max-w-2xl mx-auto">
-      <h1 className="text-lg font-bold">💼 관리자 출금 승인/반려 페이지</h1>
-
-      {withdraws.length === 0 && <p>출금 요청 내역이 없습니다.</p>}
-
-      {withdraws.map((w) => (
+    <div className="p-4 max-w-xl mx-auto">
+      <h1 className="text-xl font-bold mb-4">🛠️ 관리자 페이지 (아이템 관리)</h1>
+      {items.length === 0 && <p>등록된 아이템이 없습니다.</p>}
+      {items.map((item) => (
         <div
-          key={w.id}
-          className="border p-4 rounded flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2"
+          key={item.id}
+          className="border rounded p-3 mb-2 flex justify-between items-center"
         >
           <div>
-            <p>💸 금액: {w.amount} 원</p>
-            <p>🆔 사용자 ID: {w.userId}</p>
-            <p>📌 상태: {w.status}</p>
+            <div className="font-semibold">{item.title}</div>
+            <div className="text-sm text-gray-600">{item.price}원</div>
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => approveWithdraw(w)}
-              disabled={w.status === "approved" || loadingId === w.id}
-              className={`px-3 py-1 rounded text-white ${
-                w.status === "approved" || loadingId === w.id
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-green-600"
-              }`}
-            >
-              {loadingId === w.id ? "처리 중..." : "승인"}
-            </button>
-            <button
-              onClick={() => rejectWithdraw(w)}
-              disabled={w.status === "rejected" || loadingId === w.id}
-              className={`px-3 py-1 rounded text-white ${
-                w.status === "rejected" || loadingId === w.id
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-red-600"
-              }`}
-            >
-              {loadingId === w.id ? "처리 중..." : "반려"}
-            </button>
-          </div>
+          <button
+            onClick={() => handleDelete(item.id)}
+            className="bg-red-500 text-white text-sm px-3 py-1 rounded hover:bg-red-600"
+          >
+            삭제
+          </button>
         </div>
       ))}
-    </main>
+    </div>
   );
 }
