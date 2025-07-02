@@ -1,57 +1,74 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged, createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { auth, db } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 
-export default function CreateAdminPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+export default function AdminCreatePage() {
   const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
+    const checkAuth = async () => {
+      onAuthStateChanged(auth, async (user) => {
+        if (!user) {
+          router.push('/admin/login');
+          return;
+        }
+
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         const data = userDoc.data();
-        if (data.role === 'superadmin') {
+
+        if (data?.role === 'superadmin') {
           setIsSuperAdmin(true);
         } else {
           router.push('/admin/login');
         }
-      } else {
-        router.push('/admin/login');
-      }
-    });
-    return () => unsubscribe();
+
+        setLoading(false);
+      });
+    };
+
+    checkAuth();
   }, [router]);
 
-  const handleCreateAdmin = async (e) => {
-    e.preventDefault();
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      await setDoc(doc(db, 'users', user.uid), { email, role: 'admin', createdAt: new Date() });
-      alert('관리자 계정 생성 완료');
-      setEmail('');
-      setPassword('');
-    } catch (error) {
-      alert(error.message);
-    }
-  };
+  if (loading) {
+    return <div className="p-6 text-center">로딩 중...</div>;
+  }
 
-  if (!isSuperAdmin) return null;
+  if (!isSuperAdmin) {
+    return null; // 권한 없는 경우 화면 숨김 처리
+  }
 
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center p-6">
-      <h1 className="text-2xl font-bold mb-4">관리자 계정 생성</h1>
-      <form onSubmit={handleCreateAdmin} className="space-y-4 w-full max-w-xs">
-        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="관리자 이메일" className="w-full border rounded p-2" />
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="비밀번호" className="w-full border rounded p-2" />
-        <button type="submit" className="w-full bg-green-500 text-white p-2 rounded">생성</button>
+    <div className="max-w-xl mx-auto p-4">
+      <h1 className="text-xl font-bold mb-4">👑 슈퍼관리자 - 관리자 생성 페이지</h1>
+
+      {/* 여기에 관리자 생성 폼 구현 */}
+      <form className="space-y-3">
+        <input
+          type="email"
+          placeholder="관리자 이메일"
+          className="w-full p-2 border rounded"
+        />
+        <input
+          type="password"
+          placeholder="초기 비밀번호"
+          className="w-full p-2 border rounded"
+        />
+        <select className="w-full p-2 border rounded">
+          <option value="admin">일반 관리자</option>
+          <option value="superadmin">슈퍼관리자</option>
+        </select>
+        <button
+          type="submit"
+          className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
+        >
+          관리자 생성
+        </button>
       </form>
     </div>
   );
