@@ -62,7 +62,6 @@ export default function SignupPage() {
                 >
                     <option value="buyer">구매자</option>
                     <option value="seller">판매자</option>
-                    <option value="admin">관리자</option>
                 </select>
                 <button
                     type="submit"
