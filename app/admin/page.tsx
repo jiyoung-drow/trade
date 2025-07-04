@@ -3,16 +3,15 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { db, auth } from '@/lib/firebase';
-import { collection, getDocs, deleteDoc, doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 
 export default function AdminPage() {
   const router = useRouter();
-  const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const checkAuthAndFetch = async () => {
+    const checkAuth = async () => {
       onAuthStateChanged(auth, async (user) => {
         if (!user) {
           alert('로그인이 필요합니다.');
@@ -28,49 +27,47 @@ export default function AdminPage() {
           return;
         }
 
-        // 관리자 권한 확인 후 아이템 데이터 불러오기
-        const snapshot = await getDocs(collection(db, 'items'));
-        setItems(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
         setLoading(false);
       });
     };
 
-    checkAuthAndFetch();
+    checkAuth();
   }, [router]);
-
-  const handleDelete = async (id: string) => {
-    const confirmDelete = confirm('정말 삭제하시겠습니까?');
-    if (!confirmDelete) return;
-    await deleteDoc(doc(db, 'items', id));
-    setItems(items.filter((item) => item.id !== id));
-    alert('삭제 완료');
-  };
 
   if (loading) {
     return <div className="p-6 text-center">로딩 중...</div>;
   }
 
   return (
-    <div className="p-4 max-w-xl mx-auto">
-      <h1 className="text-xl font-bold mb-4">🛠️ 관리자 페이지 (아이템 관리)</h1>
-      {items.length === 0 && <p>등록된 아이템이 없습니다.</p>}
-      {items.map((item) => (
-        <div
-          key={item.id}
-          className="border rounded p-3 mb-2 flex justify-between items-center"
+    <div className="p-6 max-w-md mx-auto space-y-4">
+      <h1 className="text-2xl font-bold mb-4">🛠️ 관리자 페이지</h1>
+      <p className="text-gray-600 mb-2">관리 기능으로 이동하세요.</p>
+      <div className="flex flex-col space-y-2">
+        <button
+          onClick={() => router.push('/admin/users')}
+          className="w-full bg-blue-500 hover:bg-blue-600 text-white rounded p-2"
         >
-          <div>
-            <div className="font-semibold">{item.title}</div>
-            <div className="text-sm text-gray-600">{item.price}원</div>
-          </div>
-          <button
-            onClick={() => handleDelete(item.id)}
-            className="bg-red-500 text-white text-sm px-3 py-1 rounded hover:bg-red-600"
-          >
-            삭제
-          </button>
-        </div>
-      ))}
+          회원 관리
+        </button>
+        <button
+          onClick={() => router.push('/admin/transactions')}
+          className="w-full bg-green-500 hover:bg-green-600 text-white rounded p-2"
+        >
+          충전/출금 승인
+        </button>
+        <button
+          onClick={() => router.push('/admin/applications')}
+          className="w-full bg-purple-500 hover:bg-purple-600 text-white rounded p-2"
+        >
+          신청서 관리
+        </button>
+        <button
+          onClick={() => router.push('/admin/statistics')}
+          className="w-full bg-orange-500 hover:bg-orange-600 text-white rounded p-2"
+        >
+          통계 페이지
+        </button>
+      </div>
     </div>
   );
 }

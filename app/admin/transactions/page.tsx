@@ -7,6 +7,10 @@ import {
   getDocs,
   query,
   orderBy,
+  doc,
+  updateDoc,
+  increment,
+  getDoc,
 } from "firebase/firestore";
 
 export default function AdminTransactionsPage() {
@@ -17,25 +21,29 @@ export default function AdminTransactionsPage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const chargesSnap = await getDocs(query(collection(db, "chargeRequests"), orderBy("requestedAt", "desc")));
-      const withdrawsSnap = await getDocs(query(collection(db, "withdrawRequests"), orderBy("requestedAt", "desc")));
+      const chargesSnap = await getDocs(query(collection(db, "chargeRequests"), orderBy("createdAt", "desc")));
+      const withdrawsSnap = await getDocs(query(collection(db, "withdrawRequests"), orderBy("createdAt", "desc")));
 
-      const charges = chargesSnap.docs.map(doc => ({
-        id: doc.id,
+      const charges = chargesSnap.docs.map(docSnap => ({
+        id: docSnap.id,
         type: "charge",
-        amount: doc.data().amount,
-        status: doc.data().status,
-        userId: doc.data().userId,
-        createdAt: doc.data().requestedAt?.toDate().toLocaleString() ?? "",
+        amount: docSnap.data().amount,
+        status: docSnap.data().status,
+        uid: docSnap.data().uid,
+        depositorName: docSnap.data().depositorName,
+        createdAt: docSnap.data().createdAt?.toDate().toLocaleString() ?? "",
       }));
 
-      const withdraws = withdrawsSnap.docs.map(doc => ({
-        id: doc.id,
+      const withdraws = withdrawsSnap.docs.map(docSnap => ({
+        id: docSnap.id,
         type: "withdraw",
-        amount: doc.data().amount,
-        status: doc.data().status,
-        userId: doc.data().userId,
-        createdAt: doc.data().requestedAt?.toDate().toLocaleString() ?? "",
+        amount: docSnap.data().amount,
+        status: docSnap.data().status,
+        uid: docSnap.data().uid,
+        bankName: docSnap.data().bankName,
+        accountNumber: docSnap.data().accountNumber,
+        holderName: docSnap.data().holderName,
+        createdAt: docSnap.data().createdAt?.toDate().toLocaleString() ?? "",
       }));
 
       setTransactions([...charges, ...withdraws]);
@@ -44,12 +52,56 @@ export default function AdminTransactionsPage() {
     fetchData();
   }, []);
 
+  const handleApprove = async (t: any) => {
+    if (!confirm("해당 요청을 승인 처리하시겠습니까?")) return;
+    const userBalanceRef = doc(db, "balances", t.uid);
+    const requestRef = doc(db, t.type === "charge" ? "chargeRequests" : "withdrawRequests", t.id);
+
+    const requestSnap = await getDoc(requestRef);
+    if (requestSnap.exists() && requestSnap.data().status !== "pending") {
+      alert("이미 처리된 요청입니다.");
+      return;
+    }
+
+    // 잔액 처리
+    if (t.type === "charge") {
+      await updateDoc(userBalanceRef, {
+        amount: increment(t.amount),
+      });
+    } else if (t.type === "withdraw") {
+      await updateDoc(userBalanceRef, {
+        amount: increment(-t.amount),
+      });
+    }
+
+    // 상태 업데이트
+    await updateDoc(requestRef, { status: "approved" });
+
+    alert("승인 처리 완료");
+    location.reload();
+  };
+
+  const handleReject = async (t: any) => {
+    if (!confirm("해당 요청을 반려 처리하시겠습니까?")) return;
+    const requestRef = doc(db, t.type === "charge" ? "chargeRequests" : "withdrawRequests", t.id);
+
+    const requestSnap = await getDoc(requestRef);
+    if (requestSnap.exists() && requestSnap.data().status !== "pending") {
+      alert("이미 처리된 요청입니다.");
+      return;
+    }
+
+    await updateDoc(requestRef, { status: "rejected" });
+    alert("반려 처리 완료");
+    location.reload();
+  };
+
   const filtered = transactions.filter(t => {
     const matchesType = typeFilter ? t.type === typeFilter : true;
     const matchesStatus = statusFilter ? t.status === statusFilter : true;
     const matchesSearch =
       searchTerm.trim() === "" ||
-      t.userId.includes(searchTerm.trim());
+      t.uid.includes(searchTerm.trim());
     return matchesType && matchesStatus && matchesSearch;
   });
 
@@ -58,9 +110,9 @@ export default function AdminTransactionsPage() {
   const rejectedSum = filtered.filter(t => t.status === "rejected").reduce((acc, cur) => acc + cur.amount, 0);
 
   const downloadCSV = () => {
-    const header = "ID,Type,UserID,Amount,Status,CreatedAt\n";
+    const header = "ID,Type,UID,Amount,Status,CreatedAt\n";
     const rows = filtered.map(t =>
-      `${t.id},${t.type},${t.userId},${t.amount},${t.status},${t.createdAt}`
+      `${t.id},${t.type},${t.uid},${t.amount},${t.status},${t.createdAt}`
     ).join("\n");
 
     const blob = new Blob([header + rows], { type: "text/csv" });
@@ -74,7 +126,7 @@ export default function AdminTransactionsPage() {
 
   return (
     <main className="p-4 max-w-5xl mx-auto space-y-4">
-      <h1 className="text-lg font-bold">💼 관리자 거래 관리 및 통계</h1>
+      <h1 className="text-lg font-bold">💼 관리자 거래 관리 및 승인</h1>
 
       <div className="border p-3 rounded bg-gray-50 space-y-1">
         <p>✅ 승인 합계: {approvedSum} 원</p>
@@ -104,7 +156,7 @@ export default function AdminTransactionsPage() {
         </select>
         <input
           type="text"
-          placeholder="사용자 ID 검색"
+          placeholder="사용자 UID 검색"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="border p-2 rounded flex-1"
@@ -125,19 +177,36 @@ export default function AdminTransactionsPage() {
               <th className="border px-2 py-1">타입</th>
               <th className="border px-2 py-1">금액</th>
               <th className="border px-2 py-1">상태</th>
-              <th className="border px-2 py-1">사용자ID</th>
+              <th className="border px-2 py-1">UID</th>
               <th className="border px-2 py-1">신청시간</th>
+              <th className="border px-2 py-1">관리</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map((t) => (
               <tr key={t.id} className="text-center">
-                <td className="border px-2 py-1 text-xs">{t.id}</td>
+                <td className="border px-2 py-1 text-xs break-all">{t.id}</td>
                 <td className="border px-2 py-1">{t.type}</td>
-                <td className="border px-2 py-1">{t.amount}</td>
+                <td className="border px-2 py-1">{t.amount.toLocaleString()}</td>
                 <td className="border px-2 py-1">{t.status}</td>
-                <td className="border px-2 py-1">{t.userId}</td>
+                <td className="border px-2 py-1 text-xs break-all">{t.uid}</td>
                 <td className="border px-2 py-1">{t.createdAt}</td>
+                <td className="border px-2 py-1 space-y-1 flex flex-col">
+                  <button
+                    disabled={t.status !== "pending"}
+                    onClick={() => handleApprove(t)}
+                    className={`text-xs rounded p-1 ${t.status !== "pending" ? "bg-gray-300" : "bg-green-500 text-white"}`}
+                  >
+                    승인
+                  </button>
+                  <button
+                    disabled={t.status !== "pending"}
+                    onClick={() => handleReject(t)}
+                    className={`text-xs rounded p-1 ${t.status !== "pending" ? "bg-gray-300" : "bg-red-500 text-white"}`}
+                  >
+                    반려
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
