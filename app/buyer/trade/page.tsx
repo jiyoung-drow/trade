@@ -3,37 +3,49 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
+
+interface Item {
+  id: string;
+  title?: string;
+  price?: number;
+  buyerId?: string;
+  sellerId?: string;
+  status?: string;
+  [key: string]: any;
+}
 
 export default function BuyerTradeListPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
-  const [myRequests, setMyRequests] = useState<any[]>([]);
-  const [sellerItems, setSellerItems] = useState<any[]>([]);
+  const [user, setUser] = useState<User | null>(null);
+  const [myRequests, setMyRequests] = useState<Item[]>([]);
+  const [sellerItems, setSellerItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async (currentUser: any) => {
+    const fetchData = async (currentUser: User) => {
       const snapshot = await getDocs(collection(db, 'items'));
 
-      // 구매자가 작성한 신청서
-      const myReq = snapshot.docs
-        .map((doc) => ({ id: doc.id, ...doc.data() }))
-        .filter((item) => item.buyerId === currentUser.uid && item.status === 'waiting');
+      const allItems: Item[] = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
 
-      // 판매자가 작성한 신청서
-      const sellerReq = snapshot.docs
-        .map((doc) => ({ id: doc.id, ...doc.data() }))
+      const myReq = allItems.filter(
+        (item) => item.buyerId === currentUser.uid && item.status === 'waiting'
+      );
+
+      const sellerReq = allItems
         .filter(
           (item) =>
             item.sellerId !== currentUser.uid &&
             item.status === 'waiting' &&
-            !item.buyerId // 아직 거래되지 않은 신청서만
+            !item.buyerId
         )
         .map((item) => ({
           ...item,
-          hiddenPrice: item.price + 100 // 예: 상태/숨김 수수료 적용
+          hiddenPrice: (item.price ?? 0) + 100,
         }));
 
       setMyRequests(myReq);
@@ -41,7 +53,7 @@ export default function BuyerTradeListPage() {
       setLoading(false);
     };
 
-    onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
         alert('로그인이 필요합니다.');
         router.push('/login');
@@ -50,6 +62,8 @@ export default function BuyerTradeListPage() {
       setUser(currentUser);
       fetchData(currentUser);
     });
+
+    return () => unsubscribe();
   }, [router]);
 
   const handleBuy = async (itemId: string) => {
@@ -59,10 +73,9 @@ export default function BuyerTradeListPage() {
 
     await updateDoc(doc(db, 'items', itemId), {
       buyerId: user.uid,
-      status: 'in-progress'
+      status: 'in-progress',
     });
 
-    // 거래 진행 페이지로 이동
     router.push(`/trade/${itemId}`);
   };
 
@@ -72,7 +85,7 @@ export default function BuyerTradeListPage() {
     <div className="p-4 max-w-2xl mx-auto">
       <h1 className="text-xl font-bold mb-4">🛒 구매자 거래목록</h1>
 
-      {/* 1️⃣ 내 신청서 고정 */}
+      {/* 내 신청서 */}
       <h2 className="text-lg font-semibold mb-2">내 신청서</h2>
       {myRequests.length === 0 ? (
         <p className="text-sm text-gray-500 mb-4">작성한 신청서가 없습니다.</p>
@@ -83,14 +96,16 @@ export default function BuyerTradeListPage() {
             className="border-2 border-blue-500 rounded p-3 mb-2 flex justify-between items-center"
           >
             <div>
-              <div className="font-semibold">{item.title}</div>
-              <div className="text-sm text-gray-600">{item.price}원 (내 신청서)</div>
+              <div className="font-semibold">{item.title ?? '제목 없음'}</div>
+              <div className="text-sm text-gray-600">
+                {item.price ?? 0}원 (내 신청서)
+              </div>
             </div>
           </div>
         ))
       )}
 
-      {/* 2️⃣ 판매자 신청서 리스트 */}
+      {/* 판매자 신청서 */}
       <h2 className="text-lg font-semibold mt-6 mb-2">판매자 신청서</h2>
       {sellerItems.length === 0 ? (
         <p className="text-sm text-gray-500">구매 가능한 신청서가 없습니다.</p>
@@ -101,8 +116,10 @@ export default function BuyerTradeListPage() {
             className="border rounded p-3 mb-2 flex justify-between items-center"
           >
             <div>
-              <div className="font-semibold">{item.title}</div>
-              <div className="text-sm text-gray-600">가격: {item.hiddenPrice}원 (숨겨진 가격)</div>
+              <div className="font-semibold">{item.title ?? '제목 없음'}</div>
+              <div className="text-sm text-gray-600">
+                가격: {item.hiddenPrice ?? '비공개'}원 (숨겨진 가격)
+              </div>
             </div>
             <button
               onClick={() => handleBuy(item.id)}
