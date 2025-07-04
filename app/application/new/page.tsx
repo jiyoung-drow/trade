@@ -57,9 +57,21 @@ export default function ApplicationNewPage() {
       basePrice = Number(pricePerItem);
     }
 
+    // ✅ 역할(role) 필드 추가
+    const userDoc = await getDoc(doc(db, 'users', user.uid));
+    let role = '';
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      role = userData.role || '';
+    } else {
+      alert('사용자 정보를 불러올 수 없습니다.');
+      return;
+    }
+
     const data: any = {
       uid: user.uid,
       email: user.email,
+      role, // ✅ 역할 필드 추가
       item,
       quantity: Number(quantity),
       status,
@@ -81,16 +93,10 @@ export default function ApplicationNewPage() {
 
     alert('신청서가 등록되었습니다.');
 
-    const userDoc = await getDoc(doc(db, 'users', user.uid));
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-      if (userData.role === 'buyer') {
-        router.push('/mypage/buyer');
-      } else if (userData.role === 'seller') {
-        router.push('/mypage/seller');
-      } else {
-        router.push('/');
-      }
+    if (role === 'buyer') {
+      router.push('/mypage/buyer');
+    } else if (role === 'seller') {
+      router.push('/mypage/seller');
     } else {
       router.push('/');
     }
@@ -136,7 +142,9 @@ export default function ApplicationNewPage() {
           <input type="number" placeholder="만일 접속 시, 개당 금액" value={altPricePerItem} onChange={(e) => setAltPricePerItem(e.target.value)} className="w-full border rounded p-2" />
         )}
 
-        <button type="submit" className="w-full bg-blue-500 hover:bg-blue-600 text-white rounded p-2">신청서 등록</button>
+        <button type="submit" className="w-full bg-blue-500 hover:bg-blue-600 text-white rounded p-2">
+          신청서 등록
+        </button>
       </form>
     </div>
   );

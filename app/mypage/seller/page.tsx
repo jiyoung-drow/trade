@@ -1,52 +1,57 @@
 'use client';
+
 import { useState, useEffect } from 'react';
 import { auth, db } from '@/lib/firebase';
-import {
-  collection,
-  doc,
-  getDoc,
-  onSnapshot,
-  query,
-  where,
-  updateDoc,
-  serverTimestamp,
-} from 'firebase/firestore';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { collection, query, where, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
+import { User } from 'firebase/auth';
 
 export default function SellerMyPage() {
   const [user, setUser] = useState<User | null>(null);
-  const [requests, setRequests] = useState<any[]>([]);
+  const [applications, setApplications] = useState<any[]>([]);
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
+    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+      setUser(currentUser);
+
       if (currentUser) {
-        setUser(currentUser);
         const q = query(
-          collection(db, 'requests'),
-          where('sellerId', '==', currentUser.uid),
-          where('status', '==', 'pending')
+          collection(db, 'applications'),
+          where('uid', '==', currentUser.uid)
         );
         const unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
-          const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-          setRequests(data);
+          setApplications(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
         });
         return () => unsubscribeSnapshot();
       }
     });
-    return () => unsubscribeAuth();
+    return () => unsubscribe();
   }, []);
 
+  const handleDelete = async (id: string) => {
+    if (confirm('해당 신청서를 삭제하시겠습니까?')) {
+      await deleteDoc(doc(db, 'applications', id));
+    }
+  };
+
   return (
-    <div className="p-4">
-      <h1 className="text-xl font-bold mb-4">판매자 마이페이지</h1>
-      {requests.length === 0 ? (
-        <p>진행 중인 신청서가 없습니다.</p>
+    <div className="max-w-md mx-auto p-6 space-y-4">
+      <h1 className="text-xl font-bold">판매자 마이페이지</h1>
+      <button className="w-full bg-blue-500 text-white rounded p-2">출금하기</button>
+      {applications.length === 0 ? (
+        <p>작성한 신청서가 없습니다.</p>
       ) : (
-        requests.map((req) => (
-          <div key={req.id} className="border p-2 rounded mb-2">
-            <p>항목: {req.item}</p>
-            <p>수량: {req.quantity}</p>
-            <p>개당 가격: {req.originalPrice.toLocaleString()}원</p> {/* 비밀가격 표시 안 함 */}
+        applications.map((app) => (
+          <div key={app.id} className="border rounded p-4 space-y-1">
+            <p>항목: {app.item}</p>
+            <p>수량: {app.quantity}</p>
+            <p>상태: {app.status}</p>
+            <p>작성일: {app.createdAt?.toDate().toLocaleString() ?? '---'}</p>
+            <button
+              onClick={() => handleDelete(app.id)}
+              className="bg-red-500 text-white rounded p-1 mt-2 w-full"
+            >
+              삭제
+            </button>
           </div>
         ))
       )}
