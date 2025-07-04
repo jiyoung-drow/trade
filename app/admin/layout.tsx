@@ -1,7 +1,7 @@
 // app/admin/layout.tsx
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { auth } from '@/lib/firebase-admins';
+import { adminAuth } from '@/lib/firebase-admins';
 import { getFirestore } from 'firebase-admin/firestore';
 import { cookies } from 'next/headers';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
