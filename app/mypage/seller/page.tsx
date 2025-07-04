@@ -11,6 +11,7 @@ import {
   doc,
   getDoc,
   addDoc,
+  Timestamp,
 } from 'firebase/firestore';
 import { User } from 'firebase/auth';
 
@@ -44,24 +45,39 @@ export default function SellerMyPage() {
   }, []);
 
   const handleWithdraw = async () => {
+    if (!user) return;
+
     const bankName = prompt('출금받을 은행명을 입력하세요.');
     const accountNumber = prompt('출금받을 계좌번호를 입력하세요.');
     const holderName = prompt('예금주 성함을 입력하세요.');
-    const amount = prompt('출금하실 금액을 입력하세요.');
+    const amountStr = prompt('출금하실 금액을 입력하세요.');
 
-    if (!bankName || !accountNumber || !holderName || !amount) {
+    if (!bankName || !accountNumber || !holderName || !amountStr) {
       alert('모든 정보를 입력해 주세요.');
       return;
     }
 
+    const amount = Number(amountStr);
+    if (isNaN(amount) || amount <= 0) {
+      alert('유효한 출금 금액을 입력해 주세요.');
+      return;
+    }
+
+    // ✅ 보유금액 체크
+    if (amount > balance) {
+      alert('보유 금액을 초과하여 출금할 수 없습니다.');
+      return;
+    }
+
     await addDoc(collection(db, 'withdrawRequests'), {
-      uid: user?.uid,
+      uid: user.uid,
+      email: user.email,
       bankName,
       accountNumber,
       holderName,
-      amount: Number(amount),
+      amount,
       status: '대기중',
-      createdAt: new Date(),
+      requestedAt: Timestamp.now(),
     });
 
     alert('출금 신청이 완료되었습니다. 관리자가 확인 후 처리해 드립니다.');
