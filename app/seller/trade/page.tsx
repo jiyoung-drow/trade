@@ -40,7 +40,10 @@ export default function SellerTradeListPage() {
         const snapshot = await getDocs(collection(db, 'items'));
 
         const myReq = snapshot.docs
-          .map((doc) => ({ id: doc.id, ...(doc.data() as Item) }))
+          .map((doc) => {
+            const data = doc.data() as Item;
+            return { ...data, id: doc.id };
+          })
           .filter(
             (item) =>
               item.sellerId === currentUser.uid &&
@@ -48,7 +51,10 @@ export default function SellerTradeListPage() {
           );
 
         const buyerReq = snapshot.docs
-          .map((doc) => ({ id: doc.id, ...(doc.data() as Item) }))
+          .map((doc) => {
+            const data = doc.data() as Item;
+            return { ...data, id: doc.id };
+          })
           .filter(
             (item) =>
               item.buyerId !== currentUser.uid &&
