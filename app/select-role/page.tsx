@@ -1,15 +1,13 @@
-// ✅ app/select-role/page.tsx 전체 코드 (복붙 후 바로 사용)
-
 'use client';
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, User } from 'firebase/auth';
 
 export default function SelectRolePage() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<User | null>(null); // ✅ 타입 수정
   const router = useRouter();
 
   useEffect(() => {
@@ -32,7 +30,7 @@ export default function SelectRolePage() {
     return () => unsubscribe();
   }, [router]);
 
-  const selectRole = async (role) => {
+  const selectRole = async (role: 'buyer' | 'seller') => { // ✅ 타입 추가
     if (!user) return;
     const userRef = doc(db, 'users', user.uid);
     await setDoc(userRef, {
