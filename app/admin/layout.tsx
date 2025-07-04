@@ -1,6 +1,4 @@
-// app/admin/layout.tsx
-
-import { headers, cookies } from 'next/headers';
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { adminAuth, adminDb } from '@/lib/firebase-admins';
 
@@ -9,22 +7,6 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = headers().get('x-pathname') || '';
-
-  // ✅ '/admin/login' 페이지에서는 인증 로직을 건너뛰어 무한 리다이렉트 방지
-  if (pathname.startsWith('/admin/login')) {
-    return <>{children}</>;
-  }
-
-  // ✅ IP 제한
-  const ip = headers().get('x-forwarded-for') || '';
-  const userIP = ip.split(',')[0].trim();
-  const allowedIPs = ['122.37.165.144'];
-  if (!allowedIPs.includes(userIP)) {
-    console.warn(`❌ 차단된 IP 접근 시도: ${userIP}`);
-    return redirect('/admin/login');
-  }
-
   // ✅ 세션 쿠키 확인
   const sessionCookie = cookies().get('__session')?.value;
   if (!sessionCookie) {

@@ -1,11 +1,8 @@
-// lib/auth.ts
-
 import { signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider } from './firebase';
 
 export const signInWithGoogle = async () => {
   try {
-    // ✅ signInWithPopup 만 사용 (iOS 포함 안정적으로 작동)
     await signInWithPopup(auth, googleProvider);
     console.log('✅ 구글 로그인 성공');
   } catch (error) {
