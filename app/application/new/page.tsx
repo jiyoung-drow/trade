@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 
 export default function ApplicationFormPage() {
   const router = useRouter();
+
   const [item, setItem] = useState('');
   const [fishType, setFishType] = useState('');
   const [fishName, setFishName] = useState('');
@@ -15,8 +16,9 @@ export default function ApplicationFormPage() {
   const [pricePerItem, setPricePerItem] = useState('');
   const [secretPrice, setSecretPrice] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
     if (!item || !status || !quantity || !pricePerItem) {
       alert('모든 필수 항목을 입력해주세요.');
       return;
@@ -50,9 +52,9 @@ export default function ApplicationFormPage() {
     try {
       await addDoc(collection(db, 'applications'), applicationData);
       alert('신청서가 등록되었습니다.');
-      router.push('/dashboard'); // 필요 시 경로 조정
-    } catch (error) {
-      console.error(error);
+      router.push('/dashboard');
+    } catch (error: unknown) {
+      console.error('등록 오류:', error);
       alert('등록 중 오류가 발생했습니다.');
     }
   };
@@ -61,7 +63,6 @@ export default function ApplicationFormPage() {
     <div className="max-w-md mx-auto p-6">
       <h1 className="text-xl font-bold mb-4">신청서 작성</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
-
         {/* 항목 선택 */}
         <select
           value={item}
