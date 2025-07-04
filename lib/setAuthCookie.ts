@@ -1,13 +1,14 @@
-// lib/setAuthCookie.ts
+'use client';
 
-import { getIdToken } from "firebase/auth";
-import Cookies from "js-cookie";
+import Cookies from 'js-cookie';
+import { User } from 'firebase/auth';
 
-export const setAuthCookie = async (user) => {
-  const token = await getIdToken(user);
-  Cookies.set("firebaseAuthToken", token, { expires: 1 });
-};
-
-export const removeAuthCookie = () => {
-  Cookies.remove("firebaseAuthToken");
+export const setAuthCookie = async (user: User) => {
+  try {
+    const token = await user.getIdToken();
+    Cookies.set('token', token, { expires: 1 });
+    console.log('Auth cookie set successfully');
+  } catch (error) {
+    console.error('Error setting auth cookie:', error);
+  }
 };
