@@ -45,7 +45,7 @@ export default function SellerDashboard() {
   return (
     <div className="max-w-md mx-auto p-4 space-y-2">
       <h1 className="text-xl font-bold mb-2">📜 판매자 거래목록</h1>
-      <p className="text-sm text-gray-600">구매자가 작성한 신청서만 비밀가격으로 표시됩니다.</p>
+      <p className="text-sm text-gray-600">구매자가 작성한 신청서만 표시됩니다.</p>
       {message && <p className="text-red-500">{message}</p>}
 
       {applications.map((app) => (

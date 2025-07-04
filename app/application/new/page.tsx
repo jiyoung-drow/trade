@@ -3,7 +3,16 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  doc,
+  getDoc,
+  query,
+  where,
+  getDocs
+} from 'firebase/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
 
 export default function ApplicationNewPage() {
@@ -30,6 +39,21 @@ export default function ApplicationNewPage() {
     e.preventDefault();
     if (!item || !quantity || !status || !user) {
       alert('모든 항목을 입력해주세요.');
+      return;
+    }
+
+    // ✅ 같은 항목 신청서가 있는지 확인
+    const existingQuery = query(
+      collection(db, 'applications'),
+      where('uid', '==', user.uid),
+      where('item', '==', item),
+      where('status', 'in', ['미접', '접속', '진행중'])
+    );
+
+    const existingSnapshot = await getDocs(existingQuery);
+
+    if (!existingSnapshot.empty) {
+      alert(`이미 "${item}" 항목으로 작성한 신청서가 존재합니다. 해당 신청서를 삭제한 후 다시 작성해주세요.`);
       return;
     }
 
@@ -71,7 +95,7 @@ export default function ApplicationNewPage() {
     const data: any = {
       uid: user.uid,
       email: user.email,
-      role, // ✅ 역할 필드 추가
+      role,
       item,
       quantity: Number(quantity),
       status,

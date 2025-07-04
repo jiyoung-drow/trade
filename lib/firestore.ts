@@ -11,7 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-// ✅ UID 기반 신청서 불러오기
+// ✅ UID 기반 신청서 불러오기 (마이페이지용)
 export const fetchUserApplications = async (userId: string, role: string) => {
   const q = query(
     collection(db, "applications"),
@@ -41,7 +41,7 @@ export const createApplication = async (data: any) => {
   await addDoc(collection(db, "applications"), data);
 };
 
-// ✅ 역할별 상대방 신청서만 가져오기 + 비밀가격 가공
+// ✅ 역할별 상대방 신청서만 가져오기
 export const fetchAvailableApplications = async (
   uid: string,
   role: "buyer" | "seller"
@@ -65,7 +65,7 @@ export const fetchAvailableApplications = async (
       if (elapsedSeconds > 600) return null; // 10분 초과 제외
       if (data.uid === uid) return null; // 자신의 신청서 제외
 
-      // 비밀가격 가공 (문구 표시 X)
+      // 가격 조정만 적용 (문구 없이 내부 처리)
       if (role === "buyer") {
         data.price = (data.price || 0) + 100;
       } else if (role === "seller") {
