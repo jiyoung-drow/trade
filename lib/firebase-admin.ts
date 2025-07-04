@@ -1,6 +1,9 @@
+// lib/firebase-admins.ts
+
 import admin from 'firebase-admin';
 
 if (!admin.apps.length) {
+  // .env.local에 FIREBASE_SERVICE_ACCOUNT_BASE64 환경변수(base64 인코딩된 serviceAccountKey.json) 필요
   const serviceAccount = JSON.parse(
     Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64!, 'base64').toString('utf-8')
   );
