@@ -21,17 +21,21 @@ export default function BuyerDashboard() {
       const validApplications: any[] = [];
 
       for (const docSnap of mySnap.docs) {
-        const data = docSnap.data() as { createdAt?: any; [key: string]: any }; // ✅ createdAt 타입 인식
+        const data = docSnap.data() as { createdAt?: any; price: number; userId: string; [key: string]: any };
         const appData = { id: docSnap.id, ...data };
 
         const createdAt = appData.createdAt?.toDate().getTime() || 0;
         const elapsedSeconds = (now - createdAt) / 1000;
 
         if (elapsedSeconds > 600) {
-          // 10분 경과한 신청서 자동 삭제
           await deleteApplication(docSnap.id);
         } else {
-          validApplications.push(appData);
+          // 상대방(판매자)이 작성한 신청서만 표시
+          if (appData.userId !== user.uid) {
+            // 비밀 가격 (판매자 금액 + 100)
+            appData.price = appData.price + 100;
+            validApplications.push(appData);
+          }
         }
       }
 
@@ -44,7 +48,7 @@ export default function BuyerDashboard() {
   return (
     <div className="max-w-md mx-auto p-4 space-y-2">
       <h1 className="text-xl font-bold mb-2">📜 구매자 거래목록</h1>
-      <p className="text-sm text-gray-600">구매자가 작성한 신청서는 목록 맨 위에 고정되며 10분 후 자동 삭제됩니다.</p>
+      <p className="text-sm text-gray-600">판매자가 작성한 신청서만 표시되며, 비밀가격으로 표시됩니다.</p>
       {message && <p className="text-red-500">{message}</p>}
 
       {applications.map((app) => (
@@ -52,7 +56,7 @@ export default function BuyerDashboard() {
           <p>항목: {app.item}</p>
           {app.item !== "물고기" && <p>상태: {app.status}</p>}
           <p>수량: {app.quantity}</p>
-          <p>개당 금액: {app.price}원</p>
+          <p>개당 금액(비밀가격): {app.price}원</p>
           {app.fishName && <p>물고기 이름: {app.fishName}</p>}
           <button
             onClick={async () => {
