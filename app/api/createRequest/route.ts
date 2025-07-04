@@ -1,15 +1,10 @@
-import { adminDb } from '@/lib/firebase-admins';
-import { Timestamp } from 'firebase-admin/firestore';
+import { NextResponse } from 'next/server';
 
-export async function createRequest(data: any, userId: string) {
-  const expiredAt = Timestamp.fromMillis(Date.now() + 12 * 60 * 60 * 1000); // 12시간 후 만료
-  const requestRef = adminDb.collection('requests').doc();
-
-  await requestRef.set({
-    ...data,
-    userId,
-    status: 'waiting',
-    expiredAt,
-    createdAt: Timestamp.now(),
-  });
+export async function POST(req: Request) {
+  try {
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }
