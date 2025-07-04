@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchAvailableApplications, participateInApplication, deleteApplication } from "@/lib/firestore";
+import {
+  fetchAvailableApplications,
+  participateInApplication,
+  deleteApplication,
+} from "@/lib/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
@@ -16,26 +20,19 @@ export default function SellerDashboard() {
         return;
       }
 
-      const mySnap = await fetchAvailableApplications(user.uid, "seller");
+      // ✅ 판매자 역할로 상대방(구매자) 신청서만 가져오기
+      const fetchedApps = await fetchAvailableApplications(user.uid, "seller");
       const now = Date.now();
       const validApplications: any[] = [];
 
-      for (const docSnap of mySnap.docs) {
-        const data = docSnap.data() as { createdAt?: any; price: number; userId: string; [key: string]: any };
-        const appData = { id: docSnap.id, ...data };
-
+      for (const appData of fetchedApps) {
         const createdAt = appData.createdAt?.toDate().getTime() || 0;
         const elapsedSeconds = (now - createdAt) / 1000;
 
         if (elapsedSeconds > 600) {
-          await deleteApplication(docSnap.id);
+          await deleteApplication(appData.id);
         } else {
-          // 상대방(구매자)이 작성한 신청서만 표시
-          if (appData.userId !== user.uid) {
-            // 비밀 가격 (구매자 금액 - 50)
-            appData.price = Math.max(appData.price - 50, 0); // 음수 방지
-            validApplications.push(appData);
-          }
+          validApplications.push(appData);
         }
       }
 
@@ -48,7 +45,7 @@ export default function SellerDashboard() {
   return (
     <div className="max-w-md mx-auto p-4 space-y-2">
       <h1 className="text-xl font-bold mb-2">📜 판매자 거래목록</h1>
-      <p className="text-sm text-gray-600">구매자가 작성한 신청서만 표시되며, 비밀가격으로 표시됩니다.</p>
+      <p className="text-sm text-gray-600">구매자가 작성한 신청서만 비밀가격으로 표시됩니다.</p>
       {message && <p className="text-red-500">{message}</p>}
 
       {applications.map((app) => (
