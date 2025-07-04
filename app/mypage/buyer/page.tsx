@@ -2,11 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
+import {
+  doc,
+  getDoc,
+  addDoc,
+  collection,
+  serverTimestamp,
+} from 'firebase/firestore';
+import { onAuthStateChanged, User } from 'firebase/auth';
 
 export default function BuyerMyPage() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<User | null>(null);
   const [balance, setBalance] = useState(0);
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [showCharge, setShowCharge] = useState(false);
@@ -24,10 +30,10 @@ export default function BuyerMyPage() {
         const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
         if (userDoc.exists()) {
           const data = userDoc.data();
-          setBalance(data.balance || 0);
-          setBank(data.bank || '');
-          setAccount(data.account || '');
-          setName(data.name || '');
+          setBalance(data.balance ?? 0);
+          setBank(data.bank ?? '');
+          setAccount(data.account ?? '');
+          setName(data.name ?? '');
         }
       }
     });
@@ -35,6 +41,7 @@ export default function BuyerMyPage() {
   }, []);
 
   const handleWithdrawRequest = async () => {
+    if (!user) return;
     if (!bank || !account || !name || !amount) {
       alert('모든 정보를 입력해주세요.');
       return;
@@ -56,6 +63,7 @@ export default function BuyerMyPage() {
   };
 
   const handleChargeRequest = async () => {
+    if (!user) return;
     if (!payerName || !chargeAmount) {
       alert('입금자명과 충전 금액을 입력해주세요.');
       return;
@@ -86,7 +94,6 @@ export default function BuyerMyPage() {
       <h1 className="text-xl font-bold">마이페이지 (구매자)</h1>
       <p>보유 금액: {balance.toLocaleString()}원</p>
 
-      {/* 출금 버튼 */}
       <button
         onClick={handleWithdrawClick}
         className="w-full bg-red-500 hover:bg-red-600 text-white rounded p-2"
@@ -94,7 +101,6 @@ export default function BuyerMyPage() {
         출금 신청
       </button>
 
-      {/* 충전 버튼 */}
       <button
         onClick={() => setShowCharge(true)}
         className="w-full bg-green-500 hover:bg-green-600 text-white rounded p-2"
@@ -102,7 +108,6 @@ export default function BuyerMyPage() {
         충전 요청
       </button>
 
-      {/* 출금 입력 폼 */}
       {showWithdraw && (
         <div className="space-y-2 mt-4 border p-4 rounded">
           <input
@@ -134,7 +139,7 @@ export default function BuyerMyPage() {
             className="w-full border rounded p-2"
           />
           <button
-            onClick={() => setAmount(balance)}
+            onClick={() => setAmount(balance.toString())}
             className="w-full bg-gray-300 hover:bg-gray-400 text-black rounded p-2"
           >
             전액 입력
@@ -148,11 +153,12 @@ export default function BuyerMyPage() {
         </div>
       )}
 
-      {/* 충전 입력 폼 */}
       {showCharge && (
         <div className="space-y-2 mt-4 border p-4 rounded">
           <p>입금 후 아래 내용을 입력하고 충전 요청 버튼을 눌러주세요.</p>
-          <p className="text-sm text-gray-600">관리자 계좌: 국민은행 123456-78-91011</p>
+          <p className="text-sm text-gray-600">
+            관리자 계좌: 국민은행 123456-78-91011
+          </p>
           <input
             type="text"
             placeholder="입금자명"
