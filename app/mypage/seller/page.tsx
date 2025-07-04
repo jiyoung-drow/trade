@@ -2,11 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
+import {
+  doc,
+  getDoc,
+  addDoc,
+  collection,
+  serverTimestamp,
+} from 'firebase/firestore';
+import { onAuthStateChanged, User } from 'firebase/auth';
 
 export default function SellerMyPage() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<User | null>(null);
   const [balance, setBalance] = useState(0);
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [bank, setBank] = useState('');
@@ -21,10 +27,10 @@ export default function SellerMyPage() {
         const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
         if (userDoc.exists()) {
           const data = userDoc.data();
-          setBalance(data.balance || 0);
-          setBank(data.bank || '');
-          setAccount(data.account || '');
-          setName(data.name || '');
+          setBalance(data.balance ?? 0);
+          setBank(data.bank ?? '');
+          setAccount(data.account ?? '');
+          setName(data.name ?? '');
         }
       }
     });
@@ -32,6 +38,7 @@ export default function SellerMyPage() {
   }, []);
 
   const handleWithdrawRequest = async () => {
+    if (!user) return;
     if (!bank || !account || !name || !amount) {
       alert('모든 정보를 입력해주세요.');
       return;
@@ -100,7 +107,7 @@ export default function SellerMyPage() {
             className="w-full border rounded p-2"
           />
           <button
-            onClick={() => setAmount(balance)}
+            onClick={() => setAmount(balance.toString())}
             className="w-full bg-gray-300 hover:bg-gray-400 text-black rounded p-2"
           >
             전액 입력
