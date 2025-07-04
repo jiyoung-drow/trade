@@ -11,7 +11,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const router = useRouter();
 
-  const handleLogin = async (e) => {
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -34,6 +34,7 @@ export default function LoginPage() {
         alert("사용자 정보가 없습니다. 관리자에게 문의하세요.");
       }
     } catch (error) {
+      console.error(error);
       alert("로그인 실패: 아이디와 비밀번호를 확인하세요.");
     }
   };

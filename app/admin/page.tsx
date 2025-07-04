@@ -3,30 +3,17 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { db, auth } from '@/lib/firebase';
-import {
-  collection,
-  getDocs,
-  deleteDoc,
-  doc,
-  getDoc,
-} from 'firebase/firestore';
-import { onAuthStateChanged, User } from 'firebase/auth';
-
-interface Item {
-  id: string;
-  title?: string;
-  price?: number;
-  [key: string]: any;
-}
+import { collection, getDocs, deleteDoc, doc, getDoc } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 
 export default function AdminPage() {
   const router = useRouter();
-  const [items, setItems] = useState<Item[]>([]);
+  const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const checkAuthAndFetch = () => {
-      const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const checkAuthAndFetch = async () => {
+      onAuthStateChanged(auth, async (user) => {
         if (!user) {
           alert('로그인이 필요합니다.');
           router.push('/admin/login');
@@ -35,24 +22,17 @@ export default function AdminPage() {
 
         const userDoc = await getDoc(doc(db, 'users', user.uid));
         const data = userDoc.data();
-
         if (!data || (data.role !== 'admin' && data.role !== 'superadmin')) {
           alert('관리자 권한이 없습니다.');
           router.push('/admin/login');
           return;
         }
 
+        // 관리자 권한 확인 후 아이템 데이터 불러오기
         const snapshot = await getDocs(collection(db, 'items'));
-        const itemList: Item[] = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-
-        setItems(itemList);
+        setItems(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
         setLoading(false);
       });
-
-      return () => unsubscribe();
     };
 
     checkAuthAndFetch();
@@ -61,9 +41,8 @@ export default function AdminPage() {
   const handleDelete = async (id: string) => {
     const confirmDelete = confirm('정말 삭제하시겠습니까?');
     if (!confirmDelete) return;
-
     await deleteDoc(doc(db, 'items', id));
-    setItems((prev) => prev.filter((item) => item.id !== id));
+    setItems(items.filter((item) => item.id !== id));
     alert('삭제 완료');
   };
 
@@ -81,10 +60,8 @@ export default function AdminPage() {
           className="border rounded p-3 mb-2 flex justify-between items-center"
         >
           <div>
-            <div className="font-semibold">{item.title ?? '제목 없음'}</div>
-            <div className="text-sm text-gray-600">
-              {item.price?.toLocaleString() ?? 0}원
-            </div>
+            <div className="font-semibold">{item.title}</div>
+            <div className="text-sm text-gray-600">{item.price}원</div>
           </div>
           <button
             onClick={() => handleDelete(item.id)}
