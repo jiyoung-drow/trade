@@ -26,3 +26,13 @@ export const googleProvider = new GoogleAuthProvider();
 
 // 필요시 app 자체도 export (admin SDK 연동, 확장성 대비)
 export default app;
+import { setPersistence, browserLocalPersistence } from 'firebase/auth';
+
+// auth export 위 또는 아래에:
+setPersistence(auth, browserLocalPersistence)
+  .then(() => {
+    console.log('Firebase Auth persistence set to local');
+  })
+  .catch((error) => {
+    console.error('Failed to set Firebase Auth persistence', error);
+  });
