@@ -4,24 +4,30 @@ import { adminDb } from "@/lib/firebase-admin";
 export async function POST(req: Request) {
   try {
     const { itemId } = await req.json();
+
     if (!itemId) {
       return NextResponse.json({ success: false, error: "itemId missing" });
     }
 
     const itemRef = adminDb.collection("items").doc(itemId);
     const itemSnap = await itemRef.get();
+
     if (!itemSnap.exists) {
       return NextResponse.json({ success: false, error: "item not found" });
     }
 
-    const item = itemSnap.data();
-    const price = item.price;
+    const itemData = itemSnap.data();
+    if (!itemData) {
+      return NextResponse.json({ success: false, error: "item data missing" });
+    }
+
+    const price = itemData.price;
     const feeRate = 0.05;
     const fee = Math.floor(price * feeRate);
     const sellerAmount = price - fee;
 
-    const buyerRef = adminDb.collection("users").doc(item.buyerId);
-    const sellerRef = adminDb.collection("users").doc(item.sellerId);
+    const buyerRef = adminDb.collection("users").doc(itemData.buyerId);
+    const sellerRef = adminDb.collection("users").doc(itemData.sellerId);
 
     await adminDb.runTransaction(async (t) => {
       const buyerDoc = await t.get(buyerRef);
@@ -45,7 +51,10 @@ export async function POST(req: Request) {
       createdAt: new Date(),
     });
 
-    return NextResponse.json({ success: true, message: "Trade completed and settled." });
+    return NextResponse.json({
+      success: true,
+      message: "Trade completed and settled.",
+    });
   } catch (error) {
     console.error("정산 오류:", error);
     return NextResponse.json({ success: false, error: String(error) });
