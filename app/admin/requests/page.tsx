@@ -37,25 +37,25 @@ export default function AdminRequestsPage() {
           return;
         }
 
-        // 충전 요청 구독
+        // ✅ 충전 요청 구독 (status 오류 해결: ...doc.data() 포함)
         const unsubCharge = onSnapshot(
           collection(db, 'chargeRequests'),
           (snapshot) => {
             const fetched = snapshot.docs.map((doc) => ({
               id: doc.id,
-              ...doc.data(),
+              ...(doc.data() || {}),
             }));
             setChargeRequests(fetched.filter((r) => r.status === '대기중'));
           }
         );
 
-        // 출금 요청 구독
+        // ✅ 출금 요청 구독 (status 오류 해결: ...doc.data() 포함)
         const unsubWithdraw = onSnapshot(
           collection(db, 'withdrawRequests'),
           (snapshot) => {
             const fetched = snapshot.docs.map((doc) => ({
               id: doc.id,
-              ...doc.data(),
+              ...(doc.data() || {}),
             }));
             setWithdrawRequests(fetched.filter((r) => r.status === '대기중'));
           }
@@ -81,10 +81,9 @@ export default function AdminRequestsPage() {
     const balanceSnap = await getDoc(balanceRef);
 
     if (!balanceSnap.exists()) {
-      // 문서가 없으면 자동 생성 후 승인 처리
+      // 없으면 생성 후 승인 처리
       await setDoc(balanceRef, { amount: request.amount });
     } else {
-      // 문서가 있으면 금액 증가
       await updateDoc(balanceRef, { amount: increment(request.amount) });
     }
 
@@ -139,7 +138,7 @@ export default function AdminRequestsPage() {
     <div className="p-4 max-w-2xl mx-auto space-y-6">
       <h1 className="text-xl font-bold">💰 충전/출금 승인 페이지</h1>
 
-      {/* 충전 요청 */}
+      {/* ✅ 충전 요청 */}
       <div>
         <h2 className="font-semibold text-lg mb-2">충전 요청</h2>
         {chargeRequests.length === 0 ? (
@@ -175,7 +174,7 @@ export default function AdminRequestsPage() {
         )}
       </div>
 
-      {/* 출금 요청 */}
+      {/* ✅ 출금 요청 */}
       <div>
         <h2 className="font-semibold text-lg mb-2">출금 요청</h2>
         {withdrawRequests.length === 0 ? (
