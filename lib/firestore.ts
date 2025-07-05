@@ -16,7 +16,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-/** ✅ 마이페이지용 신청서 가져오기 */
+// ✅ 마이페이지용 신청서 가져오기
 export const fetchUserApplications = async (userId: string, role: string) => {
   const q = query(
     collection(db, "applications"),
@@ -28,7 +28,7 @@ export const fetchUserApplications = async (userId: string, role: string) => {
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 };
 
-/** ✅ 거래 참여 */
+// ✅ 거래 참여
 export const participateInApplication = async (
   applicationId: string,
   participantId: string
@@ -41,12 +41,12 @@ export const participateInApplication = async (
   });
 };
 
-/** ✅ 신청서 작성 */
+// ✅ 신청서 작성
 export const createApplication = async (data: any) => {
   await addDoc(collection(db, "applications"), data);
 };
 
-/** ✅ 거래목록용 상대방 신청서 가져오기 */
+// ✅ 거래목록용 상대방 신청서 가져오기
 export const fetchAvailableApplications = async (
   uid: string,
   role: "buyer" | "seller"
@@ -57,7 +57,6 @@ export const fetchAvailableApplications = async (
     where("role", "==", oppositeRole),
     where("status", "in", ["미접", "접속"])
   );
-
   const snapshot = await getDocs(q);
   const now = Date.now();
 
@@ -66,9 +65,7 @@ export const fetchAvailableApplications = async (
       const data = docSnap.data() as any;
       const createdAt = data.createdAt?.toDate().getTime() || 0;
       const elapsedSeconds = (now - createdAt) / 1000;
-
-      if (elapsedSeconds > 600) return null;
-      if (data.uid === uid) return null;
+      if (elapsedSeconds > 600 || data.uid === uid) return null;
 
       let adjustedPrice = data.unitPrice || 0;
       let adjustedPriceIfConnected = data.priceIfConnected || null;
@@ -100,7 +97,7 @@ export const fetchAvailableApplications = async (
     .filter(Boolean);
 };
 
-/** ✅ 거래중 신청서 가져오기 */
+// ✅ 거래중 신청서 가져오기
 export const fetchInProgressApplications = async (
   userId: string,
   role: "buyer" | "seller"
@@ -114,12 +111,12 @@ export const fetchInProgressApplications = async (
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 };
 
-/** ✅ 신청서 삭제 */
+// ✅ 신청서 삭제
 export const deleteApplication = async (applicationId: string) => {
   await deleteDoc(doc(db, "applications", applicationId));
 };
 
-/** ✅ 닉네임 전송 (판매자) */
+// ✅ 닉네임 전송 (판매자)
 export const sendNickname = async (applicationId: string, nickname: string) => {
   const ref = doc(db, "applications", applicationId);
   await updateDoc(ref, {
@@ -130,7 +127,7 @@ export const sendNickname = async (applicationId: string, nickname: string) => {
   });
 };
 
-/** ✅ 닉네임 확인 (구매자) */
+// ✅ 닉네임 확인 (구매자)
 export const confirmNickname = async (applicationId: string, nickname: string) => {
   const ref = doc(db, "applications", applicationId);
   await updateDoc(ref, {
@@ -143,7 +140,7 @@ export const confirmNickname = async (applicationId: string, nickname: string) =
   await checkAndCompleteTransaction(applicationId);
 };
 
-/** ✅ 닉네임 반려 (구매자 → 판매자) */
+// ✅ 닉네임 반려 (구매자)
 export const rejectNickname = async (
   applicationId: string,
   nickname: string,
@@ -161,7 +158,7 @@ export const rejectNickname = async (
   await checkAndCompleteTransaction(applicationId);
 };
 
-/** ✅ 판매자 반려 처리 액션 기록 */
+// ✅ 판매자 반려 처리 기록
 export const recordSellerAction = async (
   applicationId: string,
   nickname: string,
@@ -171,11 +168,7 @@ export const recordSellerAction = async (
 
   if (action === "거절") {
     await updateDoc(ref, {
-      sellerActions: arrayUnion({
-        nickname,
-        action,
-        actedAt: new Date().toISOString(),
-      }),
+      sellerActions: arrayUnion({ nickname, action, actedAt: new Date().toISOString() }),
       settlementAmount: 0,
       status: "완료",
       customerMessage: "거절된 닉네임입니다. 고객센터로 문의해주세요.",
@@ -183,17 +176,13 @@ export const recordSellerAction = async (
     });
   } else {
     await updateDoc(ref, {
-      sellerActions: arrayUnion({
-        nickname,
-        action,
-        actedAt: new Date().toISOString(),
-      }),
+      sellerActions: arrayUnion({ nickname, action, actedAt: new Date().toISOString() }),
     });
     await checkAndCompleteTransaction(applicationId);
   }
 };
 
-/** ✅ 거래 완료 처리 */
+// ✅ 거래 완료 처리
 export const completeTransaction = async (
   applicationId: string,
   settlementAmount: number
@@ -206,20 +195,20 @@ export const completeTransaction = async (
   });
 };
 
-/** ✅ 판매자 닉네임 저장 */
+// ✅ 판매자 닉네임 저장
 export const saveNicknameForSeller = async (uid: string, nickname: string) => {
   const ref = doc(db, `users/${uid}/savedNicknames/${nickname}`);
   await setDoc(ref, { nickname });
 };
 
-/** ✅ 판매자 저장 닉네임 불러오기 */
+// ✅ 판매자 저장 닉네임 불러오기
 export const fetchSavedNicknamesForSeller = async (uid: string) => {
   const q = collection(db, `users/${uid}/savedNicknames`);
   const snapshot = await getDocs(q);
   return snapshot.docs.map((doc) => doc.data().nickname);
 };
 
-/** ✅ 자동 정산 처리 */
+// ✅ 자동 정산 처리
 export const checkAndCompleteTransaction = async (applicationId: string) => {
   const ref = doc(db, "applications", applicationId);
   const snap = await getDoc(ref);
@@ -234,18 +223,14 @@ export const checkAndCompleteTransaction = async (applicationId: string) => {
     (a: any) => a.action === "승인" || a.action === "거절"
   ).length;
 
-  if (
-    sentNicknames === quantity &&
-    completedNicknames === quantity &&
-    data.status !== "완료"
-  ) {
+  if (sentNicknames === quantity && completedNicknames === quantity && data.status !== "완료") {
     const settlementAmount = (data.unitPrice || 0) * quantity;
     await completeTransaction(applicationId, settlementAmount);
     console.log(`✅ 모든 닉네임 처리 완료, 자동 정산 완료: ${applicationId}`);
   }
 };
 
-/** ✅ 완료된 신청서 개수 가져오기 */
+// ✅ 완료된 신청서 개수 가져오기
 export const fetchCompletedApplicationsCount = async (
   userId: string,
   role: "buyer" | "seller"
@@ -260,7 +245,7 @@ export const fetchCompletedApplicationsCount = async (
   return snapshot.size;
 };
 
-/** ✅ 특정 신청서 상세 데이터 가져오기 */
+// ✅ 특정 신청서 상세 데이터 가져오기
 export const fetchApplicationDetail = async (applicationId: string) => {
   const ref = doc(db, "applications", applicationId);
   const snap = await getDoc(ref);
@@ -268,7 +253,7 @@ export const fetchApplicationDetail = async (applicationId: string) => {
   return { id: snap.id, ...snap.data() };
 };
 
-/** ✅ 신청서 상태 강제 업데이트 */
+// ✅ 신청서 상태 강제 업데이트
 export const forceUpdateApplicationStatus = async (
   applicationId: string,
   newStatus: "미접" | "접속" | "진행중" | "완료"
@@ -280,17 +265,14 @@ export const forceUpdateApplicationStatus = async (
   });
 };
 
-/** ✅ 역할별 전체 신청서 개수 가져오기 */
+// ✅ 역할별 전체 신청서 개수 가져오기
 export const fetchTotalApplicationsCount = async (role: "buyer" | "seller") => {
-  const q = query(
-    collection(db, "applications"),
-    where("role", "==", role)
-  );
+  const q = query(collection(db, "applications"), where("role", "==", role));
   const snapshot = await getDocs(q);
   return snapshot.size;
 };
 
-/** ✅ 완료 거래의 정산 금액 합계 가져오기 */
+// ✅ 완료 거래의 정산 금액 합계 가져오기
 export const fetchTotalSettlementAmount = async (role: "buyer" | "seller") => {
   const q = query(
     collection(db, "applications"),
