@@ -1,44 +1,38 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { auth, db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, DocumentData } from 'firebase/firestore';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { fetchInProgressApplications } from "@/lib/firestore";
+import { auth } from "@/lib/firebase";
 
 export default function SellerInProgressPage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [trades, setTrades] = useState<DocumentData[]>([]);
+  const [applications, setApplications] = useState<any[]>([]);
+  const router = useRouter();
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-        const q = query(
-          collection(db, 'trades'),
-          where('sellerId', '==', currentUser.uid),
-          where('status', '==', 'in-progress')
-        );
-        const unsubscribeFirestore = onSnapshot(q, (snapshot) => {
-          const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          setTrades(data);
-        });
-        return () => unsubscribeFirestore();
-      }
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (!user) return;
+      const apps = await fetchInProgressApplications(user.uid, "seller");
+      setApplications(apps);
     });
-    return () => unsubscribeAuth();
+    return () => unsubscribe();
   }, []);
 
   return (
-    <div className="max-w-md mx-auto p-4">
-      <h1 className="text-xl font-bold mb-4">진행 중 거래 (판매자)</h1>
-      {trades.length === 0 ? (
-        <p>진행 중인 거래가 없습니다.</p>
+    <div className="max-w-md mx-auto p-4 space-y-2">
+      <h1 className="text-xl font-bold mb-2">🛠️ 판매자 진행중 거래</h1>
+      {applications.length === 0 ? (
+        <p>진행중인 거래가 없습니다.</p>
       ) : (
-        trades.map(trade => (
-          <div key={trade.id} className="border p-2 rounded mb-2">
-            <p>항목: {trade.item}</p>
-            <p>수량: {trade.quantity}</p>
-            <p>상태: 진행 중</p>
+        applications.map((app) => (
+          <div
+            key={app.id}
+            className="border p-2 rounded hover:bg-gray-100 cursor-pointer"
+            onClick={() => router.push(`/inprogress/seller/${app.id}`)}
+          >
+            <p>
+              {app.item} {app.status} {app.quantity}개 개당 {app.unitPrice?.toLocaleString()}원
+            </p>
           </div>
         ))
       )}

@@ -4,15 +4,14 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 export default function SuperAdminPage() {
   const router = useRouter();
-  const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const checkAuthAndFetch = async () => {
+    const checkAuth = async () => {
       onAuthStateChanged(auth, async (user) => {
         if (!user) {
           alert('로그인이 필요합니다.');
@@ -28,57 +27,87 @@ export default function SuperAdminPage() {
           return;
         }
 
-        // 슈퍼관리자 확인 후 전체 사용자 리스트 불러오기
-        const snapshot = await getDocs(collection(db, 'users'));
-        setUsers(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
         setLoading(false);
       });
     };
 
-    checkAuthAndFetch();
+    checkAuth();
   }, [router]);
 
-  // 권한 변경 핸들러
-  const toggleAdmin = async (userId: string, currentRole: string) => {
-    const confirmToggle = confirm('관리자 권한을 변경하시겠습니까?');
-    if (!confirmToggle) return;
-
-    const newRole = currentRole === 'admin' ? 'user' : 'admin';
-    await updateDoc(doc(db, 'users', userId), { role: newRole });
-    setUsers(users.map(user => user.id === userId ? { ...user, role: newRole } : user));
-    alert(`권한이 ${newRole}으로 변경되었습니다.`);
+  const handleEditAdminAccount = async () => {
+    const newAccount = prompt('새 계좌번호를 입력하세요:');
+    if (!newAccount) return alert('변경이 취소되었습니다.');
+    try {
+      await setDoc(doc(db, 'settings', 'adminAccount'), { account: newAccount }, { merge: true });
+      alert('계좌번호가 업데이트되었습니다.');
+    } catch (error) {
+      console.error(error);
+      alert('계좌번호 업데이트 중 오류가 발생했습니다.');
+    }
   };
 
-  if (loading) {
-    return <div className="p-6 text-center">로딩 중...</div>;
-  }
+  const handleEditContactLink = async () => {
+    const newLink = prompt('새 고객센터 문의 링크(URL)를 입력하세요:');
+    if (!newLink) return alert('변경이 취소되었습니다.');
+    try {
+      await setDoc(doc(db, 'settings', 'contactLink'), { url: newLink }, { merge: true });
+      alert('고객센터 링크가 업데이트되었습니다.');
+    } catch (error) {
+      console.error(error);
+      alert('고객센터 링크 업데이트 중 오류가 발생했습니다.');
+    }
+  };
+
+  if (loading) return <div className="p-6 text-center">로딩 중...</div>;
 
   return (
-    <div className="p-4 max-w-2xl mx-auto">
-      <h1 className="text-xl font-bold mb-4">👑 슈퍼관리자 페이지</h1>
-      <p className="text-sm text-gray-600 mb-6">
-        전체 유저 목록 및 관리자 권한 제어 기능 (슈퍼관리자 전용)
+    <div className="p-4 max-w-2xl mx-auto space-y-4">
+      <h1 className="text-xl font-bold">👑 슈퍼관리자 페이지</h1>
+      <p className="text-sm text-gray-600">
+        슈퍼관리자 전용 기능에 접근할 수 있습니다.
       </p>
 
-      {users.map((user) => (
-        <div
-          key={user.id}
-          className="border rounded p-3 mb-2 flex justify-between items-center"
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 mt-4">
+        <button
+          onClick={() => router.push('/admin/requests')}
+          className="bg-green-500 text-white py-2 rounded hover:bg-green-600"
         >
-          <div>
-            <div className="font-semibold">{user.name || user.email || user.id}</div>
-            <div className="text-sm text-gray-600">역할: {user.role}</div>
-          </div>
-          {user.role !== 'superadmin' && (
-            <button
-              onClick={() => toggleAdmin(user.id, user.role)}
-              className="bg-purple-500 text-white text-sm px-3 py-1 rounded hover:bg-purple-600"
-            >
-              {user.role === 'admin' ? '권한 회수' : '관리자 부여'}
-            </button>
-          )}
-        </div>
-      ))}
+          충전/출금 승인
+        </button>
+        <button
+          onClick={() => router.push('/admin/members')}
+          className="bg-blue-500 text-white py-2 rounded hover:bg-blue-600"
+        >
+          회원 관리
+        </button>
+        <button
+          onClick={() => router.push('/admin/applications')}
+          className="bg-purple-500 text-white py-2 rounded hover:bg-purple-600"
+        >
+          신청서 관리
+        </button>
+        <button
+          onClick={() => router.push('/admin/statistics')}
+          className="bg-orange-500 text-white py-2 rounded hover:bg-orange-600"
+        >
+          통계 페이지
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 mt-6">
+        <button
+          onClick={handleEditAdminAccount}
+          className="bg-gray-700 text-white py-2 rounded hover:bg-gray-800"
+        >
+          계좌번호 수정
+        </button>
+        <button
+          onClick={handleEditContactLink}
+          className="bg-pink-600 text-white py-2 rounded hover:bg-pink-700"
+        >
+          고객센터 링크 수정
+        </button>
+      </div>
     </div>
   );
 }

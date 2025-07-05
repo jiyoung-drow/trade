@@ -20,8 +20,8 @@ export default function ApplicationNewPage() {
   const [item, setItem] = useState('');
   const [quantity, setQuantity] = useState('');
   const [status, setStatus] = useState('');
-  const [pricePerItem, setPricePerItem] = useState('');
-  const [altPricePerItem, setAltPricePerItem] = useState('');
+  const [unitPrice, setUnitPrice] = useState('');
+  const [altUnitPrice, setAltUnitPrice] = useState('');
   const [fishType, setFishType] = useState('');
   const [fishName, setFishName] = useState('');
   const [fishPrice, setFishPrice] = useState('');
@@ -42,7 +42,6 @@ export default function ApplicationNewPage() {
       return;
     }
 
-    // ✅ 같은 항목 신청서가 있는지 확인
     const existingQuery = query(
       collection(db, 'applications'),
       where('uid', '==', user.uid),
@@ -51,44 +50,42 @@ export default function ApplicationNewPage() {
     );
 
     const existingSnapshot = await getDocs(existingQuery);
-
     if (!existingSnapshot.empty) {
-      alert(`이미 "${item}" 항목으로 작성한 신청서가 존재합니다. 해당 신청서를 삭제한 후 다시 작성해주세요.`);
+      alert(`이미 "${item}" 항목으로 작성한 신청서가 존재합니다.`);
       return;
     }
 
-    let secretPrice = 0;
-    if (status === '미접') secretPrice = 100;
-    else if (status === '접속') secretPrice = 50;
-
-    let basePrice = 0;
+    let calculatedUnitPrice = 0;
+    let priceIfConnected = null;
 
     if (item === '물고기') {
       if (!fishType || !fishName || !fishPrice) {
-        alert('물고기 종류, 이름, 가격을 입력해주세요.');
+        alert('물고기 정보 입력 필요.');
         return;
       }
       let fishSecretAdd = 0;
       if (fishType === 'UR') fishSecretAdd = 500;
       else if (fishType === 'SSR') fishSecretAdd = 300;
       else if (fishType === 'SR') fishSecretAdd = 100;
-      basePrice = Number(fishPrice) + fishSecretAdd;
+      calculatedUnitPrice = Number(fishPrice) + fishSecretAdd;
     } else {
-      if (!pricePerItem) {
+      if (!unitPrice) {
         alert('개당 금액을 입력해주세요.');
         return;
       }
-      basePrice = Number(pricePerItem);
+      calculatedUnitPrice = Number(unitPrice);
+      if (status === '미접' && altUnitPrice) {
+        priceIfConnected = Number(altUnitPrice);
+      }
     }
 
-    // ✅ 역할(role) 필드 추가
     const userDoc = await getDoc(doc(db, 'users', user.uid));
     let role = '';
     if (userDoc.exists()) {
       const userData = userDoc.data();
       role = userData.role || '';
     } else {
-      alert('사용자 정보를 불러올 수 없습니다.');
+      alert('사용자 정보 불러오기 실패.');
       return;
     }
 
@@ -99,7 +96,8 @@ export default function ApplicationNewPage() {
       item,
       quantity: Number(quantity),
       status,
-      pricePerItem: basePrice + secretPrice,
+      unitPrice: calculatedUnitPrice, // ✅ 개당가격으로 저장
+      priceIfConnected,
       createdAt: serverTimestamp(),
     };
 
@@ -109,21 +107,12 @@ export default function ApplicationNewPage() {
       data.fishPrice = Number(fishPrice);
     }
 
-    if (status === '미접' && altPricePerItem) {
-      data.altPricePerItem = Number(altPricePerItem);
-    }
-
     await addDoc(collection(db, 'applications'), data);
-
     alert('신청서가 등록되었습니다.');
 
-    if (role === 'buyer') {
-      router.push('/mypage/buyer');
-    } else if (role === 'seller') {
-      router.push('/mypage/seller');
-    } else {
-      router.push('/');
-    }
+    if (role === 'buyer') router.push('/mypage/buyer');
+    else if (role === 'seller') router.push('/mypage/seller');
+    else router.push('/');
   };
 
   return (
@@ -159,11 +148,11 @@ export default function ApplicationNewPage() {
         <input type="number" placeholder="수량" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="w-full border rounded p-2" required />
 
         {item !== '물고기' && (
-          <input type="number" placeholder="개당 금액" value={pricePerItem} onChange={(e) => setPricePerItem(e.target.value)} className="w-full border rounded p-2" required />
+          <input type="number" placeholder="개당 금액" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} className="w-full border rounded p-2" required />
         )}
 
         {status === '미접' && item !== '물고기' && (
-          <input type="number" placeholder="만일 접속 시, 개당 금액" value={altPricePerItem} onChange={(e) => setAltPricePerItem(e.target.value)} className="w-full border rounded p-2" />
+          <input type="number" placeholder="접속 시 개당 금액" value={altUnitPrice} onChange={(e) => setAltUnitPrice(e.target.value)} className="w-full border rounded p-2" />
         )}
 
         <button type="submit" className="w-full bg-blue-500 hover:bg-blue-600 text-white rounded p-2">

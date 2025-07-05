@@ -9,37 +9,42 @@ import { auth, db } from '@/lib/firebase';
 export default function BottomNav() {
   const router = useRouter();
   const pathname = usePathname();
-  const [role, setRole] = useState<'buyer' | 'seller' | null>(null);
-  const [shouldRender, setShouldRender] = useState(true);
+  const [role, setRole] = useState<string | null>(null);
+  const [shouldRender, setShouldRender] = useState(false);
 
   useEffect(() => {
     // 로그인, 회원가입 페이지에서는 탭바 숨김
-    if (pathname === '/login' || pathname === '/signup') {
+    if (pathname === '/login' || pathname === '/signup' || pathname.startsWith('/admin')) {
       setShouldRender(false);
       return;
-    } else {
-      setShouldRender(true);
     }
 
-    // 로그인 상태 및 역할 확인
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        const docRef = doc(db, 'users', user.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (data.role === 'buyer' || data.role === 'seller') {
-            setRole(data.role);
-          }
+      if (!user) {
+        setShouldRender(false);
+        return;
+      }
+      const docRef = doc(db, 'users', user.uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.role === 'buyer' || data.role === 'seller') {
+          setRole(data.role);
+          setShouldRender(true);
+        } else {
+          // admin, superadmin, 기타 유저는 숨김
+          setShouldRender(false);
         }
+      } else {
+        setShouldRender(false);
       }
     });
+
     return () => unsubscribe();
   }, [pathname]);
 
   if (!shouldRender || !role) return null;
 
-  // 역할별 경로 설정
   const base = role === 'buyer' ? '/dashboard/buyer' : '/dashboard/seller';
   const inprogress = role === 'buyer' ? '/inprogress/buyer' : '/inprogress/seller';
   const write = '/application/new';

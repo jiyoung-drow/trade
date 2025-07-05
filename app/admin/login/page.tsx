@@ -1,76 +1,64 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
-import { setAuthCookie } from '@/lib/setAuthCookie';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { signInWithPopup } from "firebase/auth";
+import { auth, db, googleProvider } from "@/lib/firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { setAuthCookie } from "@/lib/setAuthCookie";
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGoogleLogin = async () => {
     setLoading(true);
-
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const data = userDoc.data();
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
 
-      if (data?.role === 'admin') {
+      // Firestore에 사용자 정보 없으면 생성
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        await setDoc(userRef, {
+          email: user.email,
+          role: "user", // 기본 user, 수동으로 관리자 권한 부여 필요
+          createdAt: new Date().toISOString(),
+        });
+        alert("관리자 권한이 없는 계정입니다. 관리자에게 문의하세요.");
+        return;
+      }
+
+      const data = userSnap.data();
+
+      if (data?.role === "admin") {
         await setAuthCookie(user);
-        router.push('/admin/requests');
-      } else if (data?.role === 'superadmin') {
+        router.push("/admin/requests");
+      } else if (data?.role === "superadmin") {
         await setAuthCookie(user);
-        router.push('/admin/super');
+        router.push("/admin/super");
       } else {
-        alert('관리자 권한이 없습니다.');
+        alert("관리자 권한이 없는 계정입니다. 관리자에게 문의하세요.");
       }
     } catch (error) {
-      if (error instanceof Error) {
-        alert(error.message);
-      } else {
-        alert('로그인 실패');
-      }
+      console.error(error);
+      alert("로그인 실패: 계정 정보와 권한을 확인하세요.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center p-6">
-      <h1 className="text-2xl font-bold mb-4">관리자 로그인</h1>
-      <form onSubmit={handleLogin} className="space-y-4 w-full max-w-xs">
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="이메일"
-          className="w-full border rounded p-2"
-          required
-        />
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="비밀번호"
-          className="w-full border rounded p-2"
-          required
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 disabled:bg-gray-400"
-        >
-          {loading ? '로그인 중...' : '로그인'}
-        </button>
-      </form>
+    <div className="min-h-screen flex flex-col justify-center items-center p-6 space-y-4">
+      <button
+        onClick={handleGoogleLogin}
+        disabled={loading}
+        className="w-full max-w-xs bg-blue-600 text-white p-3 rounded hover:bg-blue-700 disabled:bg-gray-400 text-lg font-semibold"
+      >
+        {loading ? "로그인 중..." : "로그인"}
+      </button>
     </div>
   );
 }

@@ -1,4 +1,6 @@
-'use client'
+// app/signup/page.tsx
+
+'use client';
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -21,6 +23,7 @@ export default function SignupPage() {
 
             // Firestore에 사용자 정보 및 역할 저장
             await setDoc(doc(collection(db, "users"), user.uid), {
+                uid: user.uid,
                 email,
                 role,
                 createdAt: new Date()
@@ -37,7 +40,10 @@ export default function SignupPage() {
 
     return (
         <div className="flex flex-col items-center justify-center min-h-screen p-4">
-            <h1 className="text-2xl font-bold mb-4">회원가입</h1>
+            <h1 className="text-2xl font-bold mb-2">회원가입</h1>
+            <p className="text-red-500 text-sm mb-4">
+                ❗ 역할은 가입 후 변경이 불가하므로 신중하게 선택해 주세요.
+            </p>
             <form onSubmit={handleSignup} className="flex flex-col space-y-4 w-full max-w-sm">
                 <input
                     type="email"
@@ -59,9 +65,10 @@ export default function SignupPage() {
                     value={role}
                     onChange={(e) => setRole(e.target.value)}
                     className="border p-2 rounded"
+                    required
                 >
-                    <option value="buyer">구매자</option>
-                    <option value="seller">판매자</option>
+                    <option value="buyer">구매자로 가입하기</option>
+                    <option value="seller">판매자로 가입하기</option>
                 </select>
                 <button
                     type="submit"

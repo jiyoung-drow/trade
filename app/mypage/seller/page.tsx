@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { auth, db } from '@/lib/firebase';
+import { useState, useEffect } from "react";
+import { auth, db } from "@/lib/firebase";
 import {
   collection,
   query,
@@ -9,114 +9,192 @@ import {
   onSnapshot,
   deleteDoc,
   doc,
-  getDoc,
   addDoc,
-  Timestamp,
-} from 'firebase/firestore';
-import { User } from 'firebase/auth';
+  serverTimestamp,
+} from "firebase/firestore";
+import { User, signOut } from "firebase/auth";
+import { formatApplicationLine } from "@/lib/utils/formatApplicationLine";
 
 export default function SellerMyPage() {
   const [user, setUser] = useState<User | null>(null);
-  const [applications, setApplications] = useState<any[]>([]);
+  const [myApplications, setMyApplications] = useState<any[]>([]);
+  const [participatedApplications, setParticipatedApplications] = useState<any[]>([]);
+  const [rejectedWithdraws, setRejectedWithdraws] = useState<any[]>([]);
   const [balance, setBalance] = useState<number>(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
+    const unsubscribeAuth = auth.onAuthStateChanged(async (currentUser) => {
+      if (!currentUser) return;
       setUser(currentUser);
 
-      if (currentUser) {
-        const q = query(
-          collection(db, 'applications'),
-          where('uid', '==', currentUser.uid)
-        );
-        const unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
-          setApplications(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-        });
+      // 내가 작성한 신청서 구독
+      const myQ = query(collection(db, "applications"), where("uid", "==", currentUser.uid));
+      const unsubMy = onSnapshot(myQ, (snapshot) => {
+        setMyApplications(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      });
 
-        const balanceDoc = await getDoc(doc(db, 'balances', currentUser.uid));
-        if (balanceDoc.exists()) {
-          setBalance(balanceDoc.data().amount || 0);
+      // 내가 참여한 진행중 거래 구독
+      const participatedQ = query(
+        collection(db, "applications"),
+        where("participantId", "==", currentUser.uid),
+        where("status", "==", "진행중")
+      );
+      const unsubParticipated = onSnapshot(participatedQ, (snapshot) => {
+        setParticipatedApplications(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      });
+
+      // 보유 금액 구독
+      const balanceRef = doc(db, "balances", currentUser.uid);
+      const unsubBalance = onSnapshot(balanceRef, (docSnap) => {
+        if (docSnap.exists()) {
+          setBalance(docSnap.data().amount ?? 0);
+        } else {
+          setBalance(0);
         }
+      });
 
-        return () => unsubscribeSnapshot();
-      }
+      // 거절된 출금 요청 구독
+      const rejectedWithdrawsQ = query(
+        collection(db, "withdrawRequests"),
+        where("uid", "==", currentUser.uid),
+        where("status", "==", "거절됨")
+      );
+      const unsubRejectedWithdraws = onSnapshot(rejectedWithdrawsQ, (snapshot) => {
+        setRejectedWithdraws(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      });
+
+      setLoading(false);
+
+      return () => {
+        unsubMy();
+        unsubParticipated();
+        unsubBalance();
+        unsubRejectedWithdraws();
+      };
     });
-    return () => unsubscribe();
+
+    return () => unsubscribeAuth();
   }, []);
 
-  const handleWithdraw = async () => {
+  const handleDelete = async (id: string, status: string) => {
+    if (status === "진행중" || status === "완료") {
+      alert("진행중이거나 완료된 거래는 삭제할 수 없습니다.");
+      return;
+    }
+
+    if (confirm("해당 신청서를 삭제하시겠습니까?")) {
+      await deleteDoc(doc(db, "applications", id));
+      alert("삭제 완료되었습니다.");
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    alert("로그아웃되었습니다.");
+    window.location.href = "/";
+  };
+
+  const handleWithdrawRequest = async () => {
+    const name = prompt("출금자 이름을 입력하세요:");
+    if (!name) return alert("이름을 입력해주세요.");
+
+    const amount = Number(prompt("출금할 금액을 입력하세요:"));
+    if (!amount || amount <= 0) return alert("유효한 금액을 입력해주세요.");
     if (!user) return;
 
-    const bankName = prompt('출금받을 은행명을 입력하세요.');
-    const accountNumber = prompt('출금받을 계좌번호를 입력하세요.');
-    const holderName = prompt('예금주 성함을 입력하세요.');
-    const amountStr = prompt('출금하실 금액을 입력하세요.');
-
-    if (!bankName || !accountNumber || !holderName || !amountStr) {
-      alert('모든 정보를 입력해 주세요.');
-      return;
-    }
-
-    const amount = Number(amountStr);
-    if (isNaN(amount) || amount <= 0) {
-      alert('유효한 출금 금액을 입력해 주세요.');
-      return;
-    }
-
-    // ✅ 보유금액 체크
-    if (amount > balance) {
-      alert('보유 금액을 초과하여 출금할 수 없습니다.');
-      return;
-    }
-
-    await addDoc(collection(db, 'withdrawRequests'), {
+    await addDoc(collection(db, "withdrawRequests"), {
       uid: user.uid,
-      email: user.email,
-      bankName,
-      accountNumber,
-      holderName,
+      name,
       amount,
-      status: '대기중',
-      requestedAt: Timestamp.now(),
+      createdAt: serverTimestamp(),
+      status: "대기중",
     });
 
-    alert('출금 신청이 완료되었습니다. 관리자가 확인 후 처리해 드립니다.');
+    alert("출금 신청이 완료되었습니다. 관리자가 승인 시 반영됩니다.");
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('해당 신청서를 삭제하시겠습니까?')) {
-      await deleteDoc(doc(db, 'applications', id));
-    }
+  const handleConfirmRejectedWithdraw = async (id: string) => {
+    if (!confirm("이 거절된 요청을 목록에서 제거하시겠습니까?")) return;
+    await deleteDoc(doc(db, "withdrawRequests", id));
+    alert("해당 거절된 요청이 제거되었습니다.");
   };
+
+  if (loading) return <p className="p-4">로딩 중...</p>;
 
   return (
-    <div className="max-w-md mx-auto p-6 space-y-4">
-      <h1 className="text-xl font-bold">판매자 마이페이지</h1>
-      <div className="text-lg">보유 금액: {balance.toLocaleString()}원</div>
+    <div className="max-w-md mx-auto p-6 space-y-6">
+      <h1 className="text-xl font-bold">🛒 판매자 마이페이지</h1>
+      <div className="text-lg font-semibold">보유 금액: {balance.toLocaleString()}원</div>
+
       <button
-        onClick={handleWithdraw}
-        className="w-full bg-blue-500 text-white rounded p-2"
+        onClick={handleWithdrawRequest}
+        className="w-full bg-blue-600 text-white rounded p-2"
       >
-        출금하기
+        출금 신청
       </button>
-      {applications.length === 0 ? (
-        <p>작성한 신청서가 없습니다.</p>
-      ) : (
-        applications.map((app) => (
-          <div key={app.id} className="border rounded p-4 space-y-1">
-            <p>항목: {app.item}</p>
-            <p>수량: {app.quantity}</p>
-            <p>상태: {app.status}</p>
-            <p>작성일: {app.createdAt?.toDate().toLocaleString() ?? '---'}</p>
-            <button
-              onClick={() => handleDelete(app.id)}
-              className="bg-red-500 text-white rounded p-1 mt-2 w-full"
-            >
-              삭제
-            </button>
-          </div>
-        ))
-      )}
+
+      <button
+        onClick={handleLogout}
+        className="w-full bg-gray-500 text-white rounded p-2"
+      >
+        로그아웃
+      </button>
+
+      {/* 거절된 출금 요청 */}
+      <div>
+        <h2 className="font-semibold mt-6">❌ 거절된 출금 요청</h2>
+        {rejectedWithdraws.length === 0 ? (
+          <p className="text-gray-600">거절된 출금 요청이 없습니다.</p>
+        ) : (
+          rejectedWithdraws.map((withdraw) => (
+            <div key={withdraw.id} className="border rounded p-3 mb-2 bg-red-50 space-y-1">
+              <p>💸 {withdraw.amount.toLocaleString()}원 출금 요청</p>
+              <p className="text-sm text-red-700">거절 사유: {withdraw.reason || "사유 없음"}</p>
+              <button
+                onClick={() => handleConfirmRejectedWithdraw(withdraw.id)}
+                className="w-full bg-green-600 text-white rounded p-1"
+              >
+                확인 (목록에서 제거)
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* 내가 작성한 신청서 */}
+      <div>
+        <h2 className="font-semibold mt-6">내 신청서</h2>
+        {myApplications.length === 0 ? (
+          <p className="text-gray-600">작성한 신청서가 없습니다.</p>
+        ) : (
+          myApplications.map((app) => (
+            <div key={app.id} className="border rounded p-4 mb-2 space-y-1">
+              <p>{formatApplicationLine(app)}</p>
+              <button
+                onClick={() => handleDelete(app.id, app.status)}
+                className="bg-red-500 text-white rounded p-1 mt-2 w-full"
+              >
+                삭제
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* 내가 참여한 진행중 거래 */}
+      <div>
+        <h2 className="font-semibold mt-6">진행중 거래 (참여한 거래)</h2>
+        {participatedApplications.length === 0 ? (
+          <p className="text-gray-600">참여한 진행중 거래가 없습니다.</p>
+        ) : (
+          participatedApplications.map((app) => (
+            <div key={app.id} className="border rounded p-4 mb-2">
+              <p>{formatApplicationLine(app)}</p>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }

@@ -1,70 +1,130 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import { auth, db } from "@/lib/firebase";
 import {
-  fetchAvailableApplications,
-  participateInApplication,
-  deleteApplication,
-} from "@/lib/firestore";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  getDoc,
+  updateDoc,
+} from "firebase/firestore";
+import { formatApplicationLine } from "@/lib/utils/formatApplicationLine";
 
 export default function BuyerDashboard() {
+  const [user, setUser] = useState<any>(null);
   const [applications, setApplications] = useState<any[]>([]);
-  const [message, setMessage] = useState("");
+  const [balance, setBalance] = useState<number>(0);
+  const [message, setMessage] = useState<string>("");
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        setMessage("로그인이 필요합니다.");
-        return;
+    const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
+      if (!currentUser) return;
+      setUser(currentUser);
+
+      // 보유 금액
+      const balanceDoc = await getDoc(doc(db, "balances", currentUser.uid));
+      if (balanceDoc.exists()) {
+        setBalance(balanceDoc.data().amount || 0);
       }
 
-      // ✅ 비밀가격 및 역할별 필터링된 신청서 배열 반환
-      const fetchedApps = await fetchAvailableApplications(user.uid, "buyer");
-      const now = Date.now();
-      const validApplications: any[] = [];
+      // 판매자 신청서 가져오기
+      const q = query(
+        collection(db, "applications"),
+        where("role", "==", "seller"),
+        where("status", "in", ["미접", "접속"])
+      );
 
-      for (const appData of fetchedApps) {
-        const createdAt = appData.createdAt?.toDate().getTime() || 0;
-        const elapsedSeconds = (now - createdAt) / 1000;
+      const unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
+        const fetched = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          const basePrice = data.unitPrice || 0;
+          let adjustedPrice = basePrice;
+          let adjustedPriceIfConnected = data.priceIfConnected || 0;
 
-        if (elapsedSeconds > 600) {
-          await deleteApplication(appData.id);
-        } else {
-          validApplications.push(appData);
-        }
-      }
+          // ✅ 비밀 가산 가격 처리
+          if (data.status === "미접") {
+            adjustedPrice += 100;
+          } else if (data.status === "접속") {
+            adjustedPrice += 50;
+          }
 
-      setApplications(validApplications);
+          // ✅ 접속시 가격도 비밀 가산 50원 추가
+          if (data.priceIfConnected) {
+            adjustedPriceIfConnected += 50;
+          }
+
+          return {
+            id: doc.id,
+            ...data,
+            adjustedPrice,
+            adjustedPriceIfConnected,
+          };
+        });
+        setApplications(fetched);
+      });
     });
 
     return () => unsubscribe();
   }, []);
 
+  const handleParticipate = async (app: any) => {
+    const priceToDeduct = app.adjustedPrice;
+
+    if (balance < priceToDeduct) {
+      setMessage(`⛔ 보유 금액이 부족합니다. (필요 금액: ${priceToDeduct.toLocaleString()}원)`);
+      return;
+    }
+
+    if (!window.confirm(`${priceToDeduct.toLocaleString()}원으로 거래에 참여하시겠습니까?`)) {
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, "applications", app.id), {
+        status: "진행중",
+        participantId: user.uid,
+        startedAt: new Date().toISOString(),
+      });
+
+      const newBalance = balance - priceToDeduct;
+      await updateDoc(doc(db, "balances", user.uid), {
+        amount: newBalance,
+      });
+      setBalance(newBalance);
+
+      window.alert("✅ 거래에 참여하였습니다.");
+    } catch (error) {
+      console.error(error);
+      setMessage("❌ 참여 처리 중 오류가 발생했습니다.");
+    }
+  };
+
   return (
-    <div className="max-w-md mx-auto p-4 space-y-2">
-      <h1 className="text-xl font-bold mb-2">📜 구매자 거래목록</h1>
-      <p className="text-sm text-gray-600">판매자가 작성한 신청서만 표시됩니다.</p>
+    <div className="max-w-md mx-auto p-4 space-y-3">
+      <h1 className="text-xl font-bold">📜 구매자 거래목록</h1>
+      <div className="text-lg font-semibold">
+        보유 금액: {balance.toLocaleString()}원
+      </div>
+
       {message && <p className="text-red-500">{message}</p>}
 
+      {applications.length === 0 && (
+        <p className="text-gray-500">참여 가능한 신청서가 없습니다.</p>
+      )}
+
       {applications.map((app) => (
-        <div key={app.id} className="border p-2 rounded shadow">
-          <p>항목: {app.item}</p>
-          {app.item !== "물고기" && <p>상태: {app.status}</p>}
-          <p>수량: {app.quantity}</p>
-          <p>개당 금액(비밀가격): {app.price}원</p>
-          {app.fishName && <p>물고기 이름: {app.fishName}</p>}
+        <div key={app.id} className="border rounded p-3 space-y-1">
+          {/* ✅ 한 줄로 깔끔하게 표시 & 접속시 비밀 가격 가산 표시 */}
+          <p className="text-base">
+            {app.item} {app.status} {app.quantity}개 개당 {app.adjustedPrice.toLocaleString()}원
+            {app.priceIfConnected && ` (접속시 ${app.adjustedPriceIfConnected.toLocaleString()}원)`}
+          </p>
           <button
-            onClick={async () => {
-              if (!auth.currentUser) {
-                setMessage("로그인이 필요합니다.");
-                return;
-              }
-              await participateInApplication(app.id, auth.currentUser.uid);
-              setMessage("✅ 거래 참여 완료");
-            }}
-            className="bg-green-500 text-white px-2 py-1 rounded mt-2 w-full"
+            onClick={() => handleParticipate(app)}
+            className="w-full bg-green-500 text-white rounded p-2"
           >
             구매하기
           </button>
