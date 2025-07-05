@@ -14,88 +14,84 @@ import {
   setDoc,
 } from 'firebase/firestore';
 
+interface RequestData {
+  id: string;
+  status?: string;
+  amount?: number;
+  uid?: string;
+  name?: string;
+  [key: string]: any;
+}
+
 export default function AdminRequestsPage() {
   const router = useRouter();
-  const [chargeRequests, setChargeRequests] = useState<any[]>([]);
-  const [withdrawRequests, setWithdrawRequests] = useState<any[]>([]);
+  const [chargeRequests, setChargeRequests] = useState<RequestData[]>([]);
+  const [withdrawRequests, setWithdrawRequests] = useState<RequestData[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const checkAuthAndFetch = async () => {
-      onAuthStateChanged(auth, async (user) => {
-        if (!user) {
-          alert('로그인이 필요합니다.');
-          router.push('/admin/login');
-          return;
-        }
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        alert('로그인이 필요합니다.');
+        router.push('/admin/login');
+        return;
+      }
 
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        const data = userDoc.data();
-        if (!data || (data.role !== 'superadmin' && data.role !== 'admin')) {
-          alert('접근 권한이 없습니다.');
-          router.push('/admin/login');
-          return;
-        }
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      const data = userDoc.data();
+      if (!data || (data.role !== 'superadmin' && data.role !== 'admin')) {
+        alert('접근 권한이 없습니다.');
+        router.push('/admin/login');
+        return;
+      }
 
-        // ✅ 충전 요청 구독 (status 오류 해결: ...doc.data() 포함)
-        const unsubCharge = onSnapshot(
-          collection(db, 'chargeRequests'),
-          (snapshot) => {
-            const fetched = snapshot.docs.map((doc) => ({
-              id: doc.id,
-              ...(doc.data() || {}),
-            }));
-            setChargeRequests(fetched.filter((r) => r.status === '대기중'));
-          }
-        );
-
-        // ✅ 출금 요청 구독 (status 오류 해결: ...doc.data() 포함)
-        const unsubWithdraw = onSnapshot(
-          collection(db, 'withdrawRequests'),
-          (snapshot) => {
-            const fetched = snapshot.docs.map((doc) => ({
-              id: doc.id,
-              ...(doc.data() || {}),
-            }));
-            setWithdrawRequests(fetched.filter((r) => r.status === '대기중'));
-          }
-        );
-
-        setLoading(false);
-
-        return () => {
-          unsubCharge();
-          unsubWithdraw();
-        };
+      const unsubCharge = onSnapshot(collection(db, 'chargeRequests'), (snapshot) => {
+        const fetched: RequestData[] = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...(docSnap.data() ?? {}),
+        }));
+        setChargeRequests(fetched.filter((r) => r.status === '대기중'));
       });
-    };
 
-    checkAuthAndFetch();
+      const unsubWithdraw = onSnapshot(collection(db, 'withdrawRequests'), (snapshot) => {
+        const fetched: RequestData[] = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...(docSnap.data() ?? {}),
+        }));
+        setWithdrawRequests(fetched.filter((r) => r.status === '대기중'));
+      });
+
+      setLoading(false);
+
+      return () => {
+        unsubCharge();
+        unsubWithdraw();
+      };
+    });
+
+    return () => unsubscribe();
   }, [router]);
 
-  /** ✅ 충전 승인 */
-  const handleApproveCharge = async (request: any) => {
+  const handleApproveCharge = async (request: RequestData) => {
     if (!confirm(`충전 ${request.amount}원을 승인하시겠습니까?`)) return;
+    if (!request.uid) return;
 
     const balanceRef = doc(db, 'balances', request.uid);
     const balanceSnap = await getDoc(balanceRef);
 
     if (!balanceSnap.exists()) {
-      // 없으면 생성 후 승인 처리
       await setDoc(balanceRef, { amount: request.amount });
     } else {
-      await updateDoc(balanceRef, { amount: increment(request.amount) });
+      await updateDoc(balanceRef, { amount: increment(request.amount ?? 0) });
     }
 
     await updateDoc(doc(db, 'chargeRequests', request.id), { status: '승인됨' });
     alert('충전이 승인되었습니다.');
   };
 
-  /** ✅ 충전 거절 */
-  const handleRejectCharge = async (request: any) => {
+  const handleRejectCharge = async (request: RequestData) => {
     const reason = prompt('거절 사유를 입력하세요:', '사유 없음');
     if (!reason) return;
-
     await updateDoc(doc(db, 'chargeRequests', request.id), {
       status: '거절됨',
       reason,
@@ -103,9 +99,9 @@ export default function AdminRequestsPage() {
     alert('충전이 거절되었습니다.');
   };
 
-  /** ✅ 출금 승인 */
-  const handleApproveWithdraw = async (request: any) => {
+  const handleApproveWithdraw = async (request: RequestData) => {
     if (!confirm(`출금 ${request.amount}원을 승인하시겠습니까?`)) return;
+    if (!request.uid) return;
 
     const balanceRef = doc(db, 'balances', request.uid);
     const balanceSnap = await getDoc(balanceRef);
@@ -115,16 +111,14 @@ export default function AdminRequestsPage() {
       return;
     }
 
-    await updateDoc(balanceRef, { amount: increment(-request.amount) });
+    await updateDoc(balanceRef, { amount: increment(-(request.amount ?? 0)) });
     await updateDoc(doc(db, 'withdrawRequests', request.id), { status: '승인됨' });
     alert('출금이 승인되었습니다.');
   };
 
-  /** ✅ 출금 거절 */
-  const handleRejectWithdraw = async (request: any) => {
+  const handleRejectWithdraw = async (request: RequestData) => {
     const reason = prompt('거절 사유를 입력하세요:', '사유 없음');
     if (!reason) return;
-
     await updateDoc(doc(db, 'withdrawRequests', request.id), {
       status: '거절됨',
       reason,
@@ -138,7 +132,6 @@ export default function AdminRequestsPage() {
     <div className="p-4 max-w-2xl mx-auto space-y-6">
       <h1 className="text-xl font-bold">💰 충전/출금 승인 페이지</h1>
 
-      {/* ✅ 충전 요청 */}
       <div>
         <h2 className="font-semibold text-lg mb-2">충전 요청</h2>
         {chargeRequests.length === 0 ? (
@@ -152,7 +145,7 @@ export default function AdminRequestsPage() {
               <div>
                 <div className="font-semibold">{req.name || req.uid}</div>
                 <div className="text-sm text-gray-600">
-                  요청 금액: {req.amount.toLocaleString()}원
+                  요청 금액: {req.amount?.toLocaleString()}원
                 </div>
               </div>
               <div className="space-x-2">
@@ -174,7 +167,6 @@ export default function AdminRequestsPage() {
         )}
       </div>
 
-      {/* ✅ 출금 요청 */}
       <div>
         <h2 className="font-semibold text-lg mb-2">출금 요청</h2>
         {withdrawRequests.length === 0 ? (
@@ -188,7 +180,7 @@ export default function AdminRequestsPage() {
               <div>
                 <div className="font-semibold">{req.name || req.uid}</div>
                 <div className="text-sm text-gray-600">
-                  요청 금액: {req.amount.toLocaleString()}원
+                  요청 금액: {req.amount?.toLocaleString()}원
                 </div>
               </div>
               <div className="space-x-2">
