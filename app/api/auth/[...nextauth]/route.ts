@@ -1,18 +1,17 @@
 // app/api/auth/[...nextauth]/route.ts
 
-import NextAuth from "next-auth";
+// NextAuth, NextAuthOptions, 그리고 사용할 프로바이더를 불러옵니다.
+import NextAuth, { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-import type { NextAuthOptions } from "next-auth";
 
+// authOptions 객체를 정의합니다. 이 객체는 NextAuth의 설정 정보를 담습니다.
 export const authOptions: NextAuthOptions = {
-  // 공급자 (Providers) 설정
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
   ],
-  // 콜백 (Callbacks) 설정
   callbacks: {
     async session({ session, token }) {
       if (session.user) {
@@ -23,10 +22,10 @@ export const authOptions: NextAuthOptions = {
   },
 };
 
-// NextAuth 핸들러를 생성합니다.
-// Next.js 라우터는 이 핸들러를 통해 GET 및 POST 요청을 처리하게 됩니다.
+// NextAuth 함수를 사용하여 핸들러를 생성합니다.
+// 이렇게 하면 authOptions 객체가 라우트 핸들러로 변환됩니다.
 const handler = NextAuth(authOptions);
 
 // Next.js App Router가 인식할 수 있도록 GET과 POST로 핸들러를 내보냅니다.
-// 이렇게 하면 "authOptions"를 직접 export하는 오류를 해결할 수 있습니다.
+// 이 부분이 핵심입니다. authOptions를 직접 내보내면 안 됩니다.
 export { handler as GET, handler as POST };
