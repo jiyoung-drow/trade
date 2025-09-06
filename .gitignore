@@ -1,49 +1,47 @@
-<<<<<<< HEAD
+# Node
 node_modules
-# Keep environment variables out of version control
+
+# Environment variables
 .env
+.env.local
+.env.development
+.env.production
 
-/generated/prisma
-=======
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Prisma
+prisma/dev.db
+prisma/dev.db-journal
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
-
-# testing
-/coverage
-
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
+# Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
+pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# OS
+.DS_Store
 
-# vercel
-.vercel
+# Build output
+/build
+/dist
 
-# typescript
+# Coverage
+/coverage
+
+# IDE
+.vscode
+.idea
+
+# Misc
+*.pem
+
+# Cloudflare Pages ignores these automatically, but safe to include
+.next/
+out/
+
+# Typescript
 *.tsbuildinfo
-next-env.d.ts
->>>>>>> b3b46122dd8b9a7c22eca08e4f4f150150bcb0fb
+
+# Lock files (optional, remove if you use lockfiles)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml

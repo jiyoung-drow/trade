@@ -1,0 +1,149 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Helper Functions ---
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isSeller() {
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return isAuthenticated() && userDoc.exists && userDoc.data != null && userDoc.data.role == 'seller';
+    }
+
+    function isBuyer() {
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return isAuthenticated() && userDoc.exists && userDoc.data != null && userDoc.data.role == 'buyer';
+    }
+
+    function isAdminEmail() {
+      return isAuthenticated() && request.auth.token.email == "shepollux@gmail.com";
+    }
+
+    // --- users 컬렉션 (수정: 본인 업데이트 조건 더욱 완화) ---
+    match /users/{uid} {
+      allow read: if isAuthenticated() && request.auth.uid == uid;
+      allow create: if isAuthenticated() && request.auth.uid == uid;
+
+      // UPDATE RULE REVISION:
+      // 본인이 본인 문서를 업데이트하는 경우 (balance 변경만 허용하거나, 다른 필드도 유연하게 허용)
+      allow update: if request.auth.uid == uid && (
+        // Case 1: 'balance' 필드만 변경하거나, 'balance' 필드가 포함된 업데이트 요청
+        // request.resource.data.balance가 존재하고 숫자이며,
+        // 다른 필드가 변경되지 않거나, 변경이 허용되는 특정 필드들만 변경되는지 확인
+        // (이전 'hasOnly'가 문제를 일으킬 수 있으므로 'balance' 필드의 존재와 타입만 확인)
+        request.resource.data.balance is number && // balance 필드가 숫자여야 함
+        // 추가적으로, role 필드 변경은 허용하지 않음 (create시에만 설정되도록)
+        (!request.resource.data.role || request.resource.data.role == resource.data.role)
+      )
+      || ( // Case 2: 관리자(특정 UID)가 다른 사용자의 'balance'를 감소시키는 경우
+        request.auth.uid == "115501195204865933866" && // 관리자 UID (확인 필요: 이 UID가 실제로 관리자 UID인지)
+        request.auth.uid != uid && // 다른 사용자의 문서에 대한 업데이트
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['balance']) && // 오직 balance 필드만 변경
+        request.resource.data.balance is number && // 숫자인지 확인
+        request.resource.data.balance < resource.data.balance // 잔액 감소만 허용
+      );
+    }
+
+    // --- applications 컬렉션 (이전 수정과 동일) ---
+    match /applications/{docId} {
+      allow create: if isAuthenticated();
+      allow read: if true;
+
+      allow update: if isAuthenticated() && (
+        // Case A: 신청서 작성자(Owner)가 자신의 신청서를 업데이트하는 경우
+        (request.auth.uid == resource.data.uid && (
+            request.resource.data.keys().hasAll(resource.data.keys()) ||
+            request.resource.data.diff(resource.data).affectedKeys().hasAny([
+                "rejected", "approved", "tradeLink", "sellerAccount",
+                "buyerConfirmedLink", "buyerRejectedLink", "buyerSettlementClicked", "sellerFinalSettlementClicked",
+                "needsAdmin", "closed", "settled",
+                "remainingQuantity", "quantity", "itemType", "fishName",
+                "status", "unitPrice", "altUnitPrice", "todayOrTomorrow",
+                "participants", "sellerParticipations", "buyerParticipations", "sellerEntries",
+                "accountNickname"
+            ])
+            || (request.resource.data.approved == true && resource.data.approved == false)
+            || (request.resource.data.closed == true && resource.data.closed == false)
+            || (request.resource.data.settled == true && resource.data.settled == false)
+            || (request.resource.data.rejected == true && resource.data.rejected == false)
+        ))
+        ||
+        // Case B: 구매자가 판매자 신청서에 참여하는 경우 (handleParticipate 로직)
+        (
+          isBuyer() &&
+          resource.data.role == 'seller' &&
+          !resource.data.rejected && !resource.data.closed && !resource.data.settled &&
+          !resource.data.participants.hasAny([request.auth.uid]) &&
+          request.resource.data.participants.hasAll(resource.data.participants.concat([request.auth.uid])) &&
+          request.resource.data.approved == true
+        )
+        ||
+        // Case C: 판매자가 구매자 신청서에 참여하는 경우 (handleParticipate 로직)
+        (
+          isSeller() &&
+          resource.data.role == 'buyer' &&
+          !resource.data.rejected && !resource.data.closed && !resource.data.settled &&
+          !resource.data.participants.hasAny([request.auth.uid]) &&
+          request.resource.data.participants.hasAll(resource.data.participants.concat([request.auth.uid])) &&
+          request.resource.data.approved == true
+        )
+        ||
+        // Case D: 관리자는 모든 applications 문서를 업데이트할 수 있도록 허용
+        isAdminEmail()
+      );
+      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.uid || isAdminEmail());
+    }
+
+    // --- transactions 컬렉션 (기존과 동일) ---
+    match /transactions/{docId} {
+      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
+      allow read, update, delete: if isAuthenticated() && (
+        request.auth.uid == resource.data.uid || isAdminEmail()
+      );
+    }
+
+    // --- saved_infos 컬렉션 (기존과 동일) ---
+    match /saved_infos/{docId} {
+      allow read: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isAdminEmail()
+      );
+      allow create: if isAuthenticated() && (
+        !request.resource.data.keys().hasAny(['userId']) ||
+        request.resource.data.userId == request.auth.uid ||
+        isAdminEmail()
+      );
+    }
+
+    // --- admin_only 컬렉션 (기존과 동일) ---
+    match /admin_only/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdminEmail();
+    }
+
+    // --- config 컬렉션 (기존과 동일) ---
+    match /config/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdminEmail();
+    }
+
+    // --- admin_settings 컬렉션 (기존과 동일) ---
+    match /admin_settings/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdminEmail();
+    }
+
+    // --- feeSettings 컬렉션 (기존과 동일) ---
+    match /feeSettings/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdminEmail();
+    }
+
+    // --- 관리자 전체 권한 fallback ---
+    match /{document=**} {
+      allow read, write: if isAdminEmail();
+    }
+  }
+}

@@ -9,9 +9,15 @@ datasource db {
 
 model User {
   id        String   @id @default(cuid())
-  name      String?
-  email     String   @unique
-  password  String?
-  role      String   @default("buyer") // buyer, seller, admin
+  uid              String             // 작성자 UID
+  role             String             // 'buyer' | 'seller'
+  item             String             // 항목 (티켓/꽃/물고기)
+  status           String             // 상태 (미접/접속)
+  quantity         Int                // 수량
+  unitPrice        Int                // 개당 금액
+  priceIfConnected Int?               // 접속 시 가격 (선택)
+  fishType         String?            // 물고기 종류 (UR/SSR/SR)
+  fishName         String?            // 물고기 이름
+  fishPrice        Int?               // 물고기 금액
   createdAt DateTime @default(now())
 }
