@@ -1,17 +1,20 @@
-// lib/authOptions.ts
-
 import { AuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import KakaoProvider from "next-auth/providers/kakao";
 import { FirestoreAdapter } from "@auth/firebase-adapter";
 import { cert } from "firebase-admin/app";
 
-// Firebase Admin SDK 서비스 계정 설정
-const serviceAccount = {
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-  privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-};
+// ✅ 환경 변수에서 서비스 계정 키 전체를 불러와 파싱
+const firebaseServiceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+
+if (!firebaseServiceAccountKey) {
+  throw new Error("❌ FIREBASE_SERVICE_ACCOUNT_KEY is not defined in the environment variables.");
+}
+
+const serviceAccount = JSON.parse(firebaseServiceAccountKey);
+// Netlify 환경 변수에서 줄바꿈 문자를 올바르게 처리
+serviceAccount.privateKey = serviceAccount.private_key.replace(/\\n/g, "\n");
+
 
 export const authOptions: AuthOptions = {
   providers: [

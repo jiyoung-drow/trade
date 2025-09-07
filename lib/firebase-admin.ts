@@ -1,5 +1,3 @@
-// lib/firebase-admin.ts
-
 import { cert, getApps, getApp, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
@@ -9,15 +7,22 @@ import { getAuth } from "firebase-admin/auth";
 const rawKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
 
 if (!rawKey) {
-  throw new Error("❌ FIREBASE_SERVICE_ACCOUNT_KEY is not defined in .env.local");
+  console.error("❌ FIREBASE_SERVICE_ACCOUNT_KEY is not defined.");
+  throw new Error("환경 변수 FIREBASE_SERVICE_ACCOUNT_KEY가 설정되지 않았습니다.");
 }
 
 let parsedKey;
 try {
-  parsedKey = JSON.parse(rawKey);
-  parsedKey.private_key = parsedKey.private_key.replace(/\\n/g, "\n");
+  // 환경 변수 문자열에서 발생할 수 있는 추가 따옴표를 제거
+  const cleanedKey = rawKey.startsWith('"') && rawKey.endsWith('"') ? rawKey.slice(1, -1) : rawKey;
+  
+  // 줄바꿈 문자 처리 (JSON 문자열에 \\n가 포함된 경우)
+  const finalKey = cleanedKey.replace(/\\n/g, "\n");
+  
+  parsedKey = JSON.parse(finalKey);
 } catch (e) {
-  throw new Error("❌ FIREBASE_SERVICE_ACCOUNT_KEY 파싱 오류: .env 파일의 JSON 문자열 확인 필요");
+  console.error("❌ FIREBASE_SERVICE_ACCOUNT_KEY 파싱 오류:", e);
+  throw new Error("환경 변수 FIREBASE_SERVICE_ACCOUNT_KEY의 JSON 형식이 올바르지 않습니다.");
 }
 
 // ✅ Firebase Admin 설정
@@ -27,7 +32,13 @@ const firebaseAdminConfig = {
 };
 
 // ✅ Firebase Admin 앱 초기화 (중복 방지)
-const adminApp = getApps().length ? getApp() : initializeApp(firebaseAdminConfig);
+// 이미 초기화된 앱이 있으면 가져오고, 없으면 새로 초기화합니다.
+let adminApp;
+if (getApps().length) {
+  adminApp = getApp();
+} else {
+  adminApp = initializeApp(firebaseAdminConfig);
+}
 
 // ✅ 필요한 Firebase 서비스 export
 export const adminDb = getFirestore(adminApp);
