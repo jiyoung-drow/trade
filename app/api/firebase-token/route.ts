@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth"; // ✅ 경로 수정
 
 // ✅ Firebase Admin SDK 초기화 (앱 중복 방지)
 if (!getApps().length) {
@@ -21,7 +21,7 @@ if (!getApps().length) {
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    const uid = session?.user?.id;
+    const uid = (session?.user as any)?.id;
     const email = session?.user?.email;
 
     console.log("✅ 세션 정보:", session);
