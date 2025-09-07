@@ -1,15 +1,17 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const geistSans = Geist({
+// 'Geist'와 'Geist_Mono' 폰트를 next/font/local을 사용하여 불러옵니다.
+// src 경로를 프로젝트 내의 실제 폰트 파일 경로로 수정해야 합니다.
+const geistSans = localFont({
+  src: "../assets/fonts/Geist-Variable.woff2", // 이 경로를 실제 폰트 파일 경로로 변경하세요.
   variable: "--font-geist-sans",
-  subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
+const geistMono = localFont({
+  src: "../assets/fonts/GeistMono-Variable.woff2", // 이 경로를 실제 폰트 파일 경로로 변경하세요.
   variable: "--font-geist-mono",
-  subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
