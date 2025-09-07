@@ -1,19 +1,23 @@
-// app/api/firebase-token/route.ts
-
 import { NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth"; // ✅ 경로 수정
+import { authOptions } from "@/lib/auth";
+
+// ✅ 환경 변수에서 서비스 계정 키 전체를 불러와 파싱
+const firebaseServiceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+
+if (!firebaseServiceAccountKey) {
+  console.error("❌ FIREBASE_SERVICE_ACCOUNT_KEY 환경 변수가 설정되지 않았습니다.");
+  throw new Error("Missing FIREBASE_SERVICE_ACCOUNT_KEY environment variable.");
+}
+
+const serviceAccount = JSON.parse(firebaseServiceAccountKey);
 
 // ✅ Firebase Admin SDK 초기화 (앱 중복 방지)
 if (!getApps().length) {
   initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    }),
+    credential: cert(serviceAccount),
   });
 }
 
