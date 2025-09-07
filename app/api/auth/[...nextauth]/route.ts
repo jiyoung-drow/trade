@@ -23,8 +23,9 @@ export const authOptions: NextAuthOptions = {
 };
 
 // NextAuth 함수를 사용하여 핸들러를 생성합니다.
+// 이렇게 생성된 handler가 실제 라우트 핸들러 역할을 합니다.
 const handler = NextAuth(authOptions);
 
-// 생성된 핸들러를 Next.js가 인식하는 GET과 POST 이름으로 내보냅니다.
+// Next.js App Router가 인식할 수 있도록 GET과 POST로 핸들러를 내보냅니다.
 // 이렇게 하면 라우트 파일의 타입 오류가 해결됩니다.
 export { handler as GET, handler as POST };
